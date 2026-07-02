@@ -203,3 +203,185 @@ func TestParseInboundPayload_UnknownBodyIsPreserved(t *testing.T) {
 		t.Fatalf("expected raw body preserved, got %q", got.Body)
 	}
 }
+
+func TestParseInboundPayload_DiscordEmbeds(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{
+		"username": "deploy-bot",
+		"content": "部署通知",
+		"embeds": [{
+			"title": "生产发布完成",
+			"description": "版本 v1.2.3 已上线",
+			"fields": [
+				{"name": "服务", "value": "api"},
+				{"name": "耗时", "value": "42s"}
+			],
+			"url": "https://example.com/release"
+		}]
+	}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "部署通知" {
+		t.Fatalf("expected content first line as subject, got %q", got.Subject)
+	}
+	if got.From != "deploy-bot" {
+		t.Fatalf("expected discord username as sender, got %q", got.From)
+	}
+	for _, want := range []string{"生产发布完成", "版本 v1.2.3 已上线", "服务", "api", "https://example.com/release"} {
+		if !strings.Contains(got.Body, want) {
+			t.Fatalf("expected body to contain %q, got %q", want, got.Body)
+		}
+	}
+}
+
+func TestParseInboundPayload_FeishuText(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{"msg_type":"text","content":{"text":"飞书文本通知\n第二行"}}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "飞书文本通知" {
+		t.Fatalf("expected Feishu text first line as subject, got %q", got.Subject)
+	}
+	if got.From != "feishu" {
+		t.Fatalf("expected feishu sender, got %q", got.From)
+	}
+	if !strings.Contains(got.Body, "第二行") {
+		t.Fatalf("expected Feishu text body, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_FeishuPost(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{
+		"msg_type": "post",
+		"content": {
+			"post": {
+				"zh_cn": {
+					"title": "项目更新",
+					"content": [
+						[{"tag":"text","text":"构建完成"}],
+						[{"tag":"a","text":"查看详情","href":"https://example.com"}]
+					]
+				}
+			}
+		}
+	}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "项目更新" {
+		t.Fatalf("expected Feishu post title, got %q", got.Subject)
+	}
+	if !strings.Contains(got.Body, "构建完成") || !strings.Contains(got.Body, "查看详情") {
+		t.Fatalf("expected Feishu post content, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_FeishuInteractive(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{
+		"msg_type":"interactive",
+		"card":{
+			"header":{"title":{"tag":"plain_text","content":"卡片告警"}},
+			"elements":[
+				{"tag":"div","text":{"tag":"lark_md","content":"**服务：** api"}},
+				{"tag":"note","elements":[{"tag":"plain_text","content":"请关注"}]}
+			]
+		}
+	}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "卡片告警" {
+		t.Fatalf("expected Feishu card title, got %q", got.Subject)
+	}
+	if !strings.Contains(got.Body, "服务") || !strings.Contains(got.Body, "请关注") {
+		t.Fatalf("expected Feishu card content, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_DingTalkMarkdown(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{"msgtype":"markdown","markdown":{"title":"钉钉告警","text":"### 钉钉告警\nCPU 过高"}}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "钉钉告警" {
+		t.Fatalf("expected DingTalk markdown title, got %q", got.Subject)
+	}
+	if got.From != "dingtalk" {
+		t.Fatalf("expected dingtalk sender, got %q", got.From)
+	}
+	if !strings.Contains(got.Body, "CPU 过高") {
+		t.Fatalf("expected DingTalk markdown text, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_WeComMarkdown(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{"msgtype":"markdown","markdown":{"content":"# 企业微信告警\n磁盘不足"}}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "企业微信告警" {
+		t.Fatalf("expected WeCom markdown heading, got %q", got.Subject)
+	}
+	if got.From != "wecom" {
+		t.Fatalf("expected wecom sender, got %q", got.From)
+	}
+	if !strings.Contains(got.Body, "磁盘不足") {
+		t.Fatalf("expected WeCom markdown content, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_FormEncoded(t *testing.T) {
+	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	got := parseInboundPayload(req, []byte("title=ServerChan&desp=%E5%8F%91%E5%B8%83%E5%AE%8C%E6%88%90"))
+
+	if got.Subject != "ServerChan" {
+		t.Fatalf("expected form title, got %q", got.Subject)
+	}
+	if got.Body != "发布完成" {
+		t.Fatalf("expected form body decoded, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_GenericNestedFields(t *testing.T) {
+	req := newJSONRequest(t)
+	body := []byte(`{
+		"event": {
+			"title": "通用告警",
+			"payload": {
+				"message": "节点不可用",
+				"service": "worker",
+				"level": "critical"
+			}
+		}
+	}`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "通用告警" {
+		t.Fatalf("expected nested title, got %q", got.Subject)
+	}
+	if !strings.Contains(got.Body, "节点不可用") || !strings.Contains(got.Body, "worker") {
+		t.Fatalf("expected nested fields in body, got %q", got.Body)
+	}
+}
+
+func newJSONRequest(t *testing.T) *http.Request {
+	t.Helper()
+	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
