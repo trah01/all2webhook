@@ -254,9 +254,11 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 		addLog(fmt.Sprintf("搜索未读邮件失败 [%s/%s]: %v", account.Name, folder, searchErr), "error")
 		return
 	}
+	addLog(fmt.Sprintf("检查邮箱文件夹 [%s/%s]: 未读邮件 %d 封", account.Name, folder, len(uids)), "info")
 
 	limit := 10
 	if len(uids) > limit {
+		addLog(fmt.Sprintf("邮箱文件夹 [%s/%s] 未读邮件过多，本轮仅处理最新 %d 封", account.Name, folder, limit), "warning")
 		uids = uids[len(uids)-limit:]
 	}
 
@@ -265,8 +267,10 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 
 		// 检查是否已处理
 		var count int
-		db.QueryRow(`SELECT COUNT(*) FROM messages WHERE id = ?`,
-			msgID).Scan(&count)
+		if err := dbQueryRow(`SELECT COUNT(*) FROM messages WHERE id = ?`, msgID).Scan(&count); err != nil {
+			addLog(fmt.Sprintf("检查消息处理状态失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, err), "error")
+			continue
+		}
 		if count > 0 {
 			continue
 		}
@@ -277,9 +281,10 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 		var section imap.BodySectionName
 		items := []imap.FetchItem{section.FetchItem(), imap.FetchEnvelope, imap.FetchInternalDate}
 		messages := make(chan *imap.Message, 1)
+		fetchDone := make(chan error, 1)
 
 		go func() {
-			c.UidFetch(seqSet, items, messages)
+			fetchDone <- c.UidFetch(seqSet, items, messages)
 		}()
 
 		var msg *imap.Message
@@ -288,8 +293,13 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 				msg = m // 获取第一个拿去处理，剩下的强行消费完（防止 IMAP Server 返回多个对象导致 Channel 卡死 goroutine 泄露）
 			}
 		}
+		if fetchErr := <-fetchDone; fetchErr != nil {
+			addLog(fmt.Sprintf("读取邮件失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, fetchErr), "error")
+			continue
+		}
 
 		if msg == nil || msg.Envelope == nil {
+			addLog(fmt.Sprintf("读取邮件为空 [%s/%s uid=%d]", account.Name, folder, uid), "warning")
 			continue
 		}
 
@@ -305,17 +315,32 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 			receivedTime = msg.Envelope.Date // 兜底
 		}
 		if receivedTime.Before(baselineTime) {
-			db.Exec(`INSERT OR IGNORE INTO messages (id, source_email, account_id, subject, from_addr, date, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'ignored', ?)`,
-				msgID, account.EmailUser, account.ID, msg.Envelope.Subject, from, msg.Envelope.Date, time.Now())
+			ignoredMsg := &Message{
+				ID:          msgID,
+				SourceEmail: account.EmailUser,
+				AccountID:   account.ID,
+				Subject:     msg.Envelope.Subject,
+				From:        from,
+				To:          account.EmailUser,
+				Date:        msg.Envelope.Date,
+				Status:      "ignored",
+				CreatedAt:   time.Now(),
+			}
+			if err := saveMessage(ignoredMsg); err != nil {
+				addLog(fmt.Sprintf("记录旧邮件忽略状态失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, err), "error")
+			}
+			addLog(fmt.Sprintf("忽略启动前旧未读邮件 [%s/%s uid=%d]: %s", account.Name, folder, uid, displaySubject(msg.Envelope.Subject)), "info")
 			continue
 		}
 
 		r := msg.GetBody(&section)
 		if r == nil {
+			addLog(fmt.Sprintf("邮件正文为空 [%s/%s uid=%d]: %s", account.Name, folder, uid, displaySubject(msg.Envelope.Subject)), "warning")
 			continue
 		}
 		mr, err := mail.CreateReader(r)
 		if err != nil {
+			addLog(fmt.Sprintf("解析邮件失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, err), "error")
 			continue
 		}
 
