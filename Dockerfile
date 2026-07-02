@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o mail2webhook main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o mail2webhook .
 
 # Final stage
 FROM alpine:latest
