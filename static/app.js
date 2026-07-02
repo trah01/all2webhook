@@ -6,6 +6,45 @@ let filterRules = [];
 let logs = [];
 let lastChecks = {};
 
+const filterTemplates = [
+    {
+        name: '屏蔽营销邮件',
+        type: 'content',
+        mode: 'blacklist',
+        patterns: ['unsubscribe', '退订', 'newsletter', 'promotion', '促销', '广告']
+    },
+    {
+        name: '只转发验证码',
+        type: 'content',
+        mode: 'whitelist',
+        patterns: ['验证码', '校验码', '动态码', 'verification code', 'security code', 'auth code']
+    },
+    {
+        name: '屏蔽自动发信人',
+        type: 'sender',
+        mode: 'blacklist',
+        patterns: ['no-reply@', 'noreply@', 'notification@', 'newsletter@']
+    },
+    {
+        name: '只允许指定域名',
+        type: 'sender',
+        mode: 'whitelist',
+        patterns: ['@example.com']
+    },
+    {
+        name: '屏蔽系统噪音',
+        type: 'content',
+        mode: 'blacklist',
+        patterns: ['cron', 'debug', 'heartbeat', 'health check', '监控恢复', '测试通知']
+    },
+    {
+        name: '只转发账单发票',
+        type: 'content',
+        mode: 'whitelist',
+        patterns: ['账单', '发票', 'invoice', 'receipt', 'payment']
+    }
+];
+
 // ===================== Navigation =====================
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -510,7 +549,35 @@ function renderFilters() {
     `).join('');
 }
 
+function renderFilterTemplates() {
+    const container = document.getElementById('filter-template-list');
+    if (!container) return;
+
+    container.innerHTML = filterTemplates.map((template, index) => {
+        const typeName = template.type === 'content' ? '邮件内容' : '发信人';
+        const modeName = template.mode === 'blacklist' ? '黑名单' : '白名单';
+        return `
+            <button class="template-card" type="button" onclick="applyFilterTemplate(${index})">
+                <span class="template-title">${escapeHtml(template.name)}</span>
+                <span class="template-meta">${typeName} / ${modeName} / ${template.patterns.length} 条</span>
+            </button>
+        `;
+    }).join('');
+}
+
+function applyFilterTemplate(index) {
+    const template = filterTemplates[index];
+    if (!template) return;
+
+    document.getElementById('filter-name').value = template.name;
+    document.getElementById('filter-type').value = template.type;
+    document.getElementById('filter-mode').value = template.mode;
+    document.getElementById('filter-patterns').value = template.patterns.join('\n');
+    document.getElementById('filter-enabled').checked = true;
+}
+
 function openFilterModal(data = null) {
+    renderFilterTemplates();
     document.getElementById('filter-modal-title').textContent = data ? '编辑过滤规则' : '添加过滤规则';
     document.getElementById('filter-id').value = data?.id || '';
     document.getElementById('filter-name').value = data?.name || '';
@@ -633,25 +700,70 @@ function openRuleModal(data = null) {
     const targetSelect = document.getElementById('rule-target');
     targetSelect.innerHTML = webhooks.map(w => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('');
 
-    const filterSelect = document.getElementById('rule-filter-rules');
-    filterSelect.innerHTML = filterRules.map(f => {
-        const typeName = f.type === 'content' ? '内容' : '发信人';
-        const modeName = f.mode === 'blacklist' ? '黑名单' : '白名单';
-        return `<option value="${f.id}">${escapeHtml(f.name)} (${typeName}/${modeName})</option>`;
-    }).join('');
-
     document.getElementById('rule-modal-title').textContent = data ? '编辑转发规则' : '添加转发规则';
     document.getElementById('rule-id').value = data?.id || '';
     document.getElementById('rule-name').value = data?.name || '';
     document.getElementById('rule-source').value = data?.source_account || 'all';
     document.getElementById('rule-target').value = data?.target_webhook || '';
     document.getElementById('rule-filters').value = (data?.filters || []).join(', ');
-    const selectedFilterIDs = new Set(data?.filter_rule_ids || []);
-    Array.from(filterSelect.options).forEach(option => {
-        option.selected = selectedFilterIDs.has(option.value);
-    });
+    renderRuleFilterDropdown(data?.filter_rule_ids || []);
     document.getElementById('rule-enabled').checked = data?.enabled !== false;
     document.getElementById('rule-modal').classList.add('active');
+}
+
+function renderRuleFilterDropdown(selectedIDs = []) {
+    const menu = document.getElementById('rule-filter-menu');
+    if (!menu) return;
+
+    const selectedSet = new Set(selectedIDs);
+    if (!filterRules.length) {
+        menu.innerHTML = '<div class="filter-empty">暂无过滤规则，请先在过滤规则页面添加</div>';
+        updateRuleFilterSummary();
+        return;
+    }
+
+    menu.innerHTML = filterRules.map(rule => {
+        const typeName = rule.type === 'content' ? '邮件内容' : '发信人';
+        const modeName = rule.mode === 'blacklist' ? '黑名单' : '白名单';
+        const enabledText = rule.enabled ? '全局启用' : '全局禁用';
+        return `
+            <label class="filter-option">
+                <input type="checkbox" class="rule-filter-checkbox" value="${escapeHtml(rule.id)}"
+                    ${selectedSet.has(rule.id) ? 'checked' : ''} onchange="updateRuleFilterSummary()">
+                <span class="filter-option-main">
+                    <span class="filter-option-title">${escapeHtml(rule.name)}</span>
+                    <span class="filter-option-meta">${typeName} / ${modeName} / ${enabledText}</span>
+                </span>
+            </label>
+        `;
+    }).join('');
+    updateRuleFilterSummary();
+}
+
+function toggleRuleFilterDropdown(event) {
+    event.stopPropagation();
+    document.getElementById('rule-filter-dropdown').classList.toggle('open');
+}
+
+function getSelectedRuleFilterIDs() {
+    return Array.from(document.querySelectorAll('.rule-filter-checkbox:checked'))
+        .map(input => input.value);
+}
+
+function updateRuleFilterSummary() {
+    const summary = document.getElementById('rule-filter-summary');
+    if (!summary) return;
+
+    const selectedIDs = getSelectedRuleFilterIDs();
+    if (selectedIDs.length === 0) {
+        summary.textContent = '未应用过滤规则';
+        return;
+    }
+
+    const names = selectedIDs
+        .map(id => filterRules.find(rule => rule.id === id)?.name)
+        .filter(Boolean);
+    summary.textContent = names.length <= 2 ? names.join('、') : `已选择 ${names.length} 个过滤规则`;
 }
 
 function editRule(id) {
@@ -670,8 +782,7 @@ async function saveRule() {
             .split(',')
             .map(s => s.trim())
             .filter(s => s),
-        filter_rule_ids: Array.from(document.getElementById('rule-filter-rules').selectedOptions)
-            .map(option => option.value),
+        filter_rule_ids: getSelectedRuleFilterIDs(),
         enabled: document.getElementById('rule-enabled').checked
     };
 
@@ -763,6 +874,7 @@ function renderHistory(messages) {
 // ===================== Utilities =====================
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+    document.getElementById('rule-filter-dropdown')?.classList.remove('open');
 }
 
 function escapeHtml(str) {
@@ -795,6 +907,14 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
         }
         mouseDownTarget = null;
     });
+});
+
+document.addEventListener('click', () => {
+    document.getElementById('rule-filter-dropdown')?.classList.remove('open');
+});
+
+document.getElementById('rule-filter-dropdown')?.addEventListener('click', event => {
+    event.stopPropagation();
 });
 
 // ===================== Initialize =====================

@@ -444,6 +444,10 @@
                 <form id="filter-form">
                     <input type="hidden" id="filter-id">
                     <div class="form-group">
+                        <label class="form-label">规则模板</label>
+                        <div class="template-grid" id="filter-template-list"></div>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">规则名称</label>
                         <input type="text" class="form-input" id="filter-name" placeholder="例如：屏蔽营销邮件">
                     </div>
@@ -523,7 +527,17 @@ unsubscribe
                     </div>
                     <div class="form-group">
                         <label class="form-label">应用过滤规则</label>
-                        <select class="form-input" id="rule-filter-rules" multiple size="5"></select>
+                        <div class="filter-dropdown" id="rule-filter-dropdown">
+                            <button class="filter-dropdown-trigger" type="button"
+                                onclick="toggleRuleFilterDropdown(event)">
+                                <span id="rule-filter-summary">未应用过滤规则</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </button>
+                            <div class="filter-dropdown-menu" id="rule-filter-menu"></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label class="form-checkbox">
