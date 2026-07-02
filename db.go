@@ -11,7 +11,6 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	_ "modernc.org/sqlite"
 )
 
 // ===================== 数据库操作 =====================
@@ -21,16 +20,13 @@ func initDB() {
 		log.Fatal("Failed to create user data directory:", err)
 	}
 
-	var err error
-	driverName := "sqlite"
-	dataSource := DBFile
-	if databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL")); databaseURL != "" {
-		driverName = "postgres"
-		dataSource = databaseURL
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required; only PostgreSQL is supported")
 	}
 
-	dbDialect = driverName
-	db, err = sql.Open(driverName, dataSource)
+	var err error
+	db, err = sql.Open("postgres", databaseURL)
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
 	}
@@ -38,56 +34,9 @@ func initDB() {
 		log.Fatal("Failed to connect database:", err)
 	}
 
-	if dbDialect == "sqlite" {
-		// 开启 WAL 模式和设置 busy_timeout ，避免并发写入锁定和提升性能
-		db.Exec("PRAGMA journal_mode=WAL;")
-		db.Exec("PRAGMA busy_timeout=5000;")
-	}
-
-	if dbDialect == "postgres" {
-		err = initPostgresSchema()
-	} else {
-		err = initSQLiteSchema()
-	}
-	if err != nil {
+	if err := initPostgresSchema(); err != nil {
 		log.Fatal("Failed to create tables:", err)
 	}
-}
-
-func initSQLiteSchema() error {
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS messages (
-			id TEXT PRIMARY KEY,
-			source_email TEXT,
-			account_id TEXT,
-			subject TEXT,
-			from_addr TEXT,
-			to_addr TEXT,
-			date DATETIME,
-			body TEXT,
-			body_html TEXT,
-			status TEXT DEFAULT 'pending',
-			target_type TEXT,
-			target_name TEXT,
-			retry_count INTEGER DEFAULT 0,
-			error_message TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			sent_at DATETIME
-		);
-		CREATE INDEX IF NOT EXISTS idx_status ON messages(status);
-		CREATE INDEX IF NOT EXISTS idx_created ON messages(created_at DESC);
-		CREATE INDEX IF NOT EXISTS idx_account ON messages(account_id);
-		CREATE TABLE IF NOT EXISTS inbound_projects (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			secret TEXT NOT NULL UNIQUE,
-			enabled BOOLEAN DEFAULT TRUE,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			rotated_at DATETIME
-		);
-		CREATE INDEX IF NOT EXISTS idx_inbound_projects_secret ON inbound_projects(secret);
-	`)
-	return err
 }
 
 func initPostgresSchema() error {
@@ -139,9 +88,6 @@ func dbQueryRow(query string, args ...interface{}) *sql.Row {
 }
 
 func rebindQuery(query string) string {
-	if dbDialect != "postgres" {
-		return query
-	}
 	var b strings.Builder
 	argIndex := 1
 	for _, r := range query {
@@ -156,38 +102,27 @@ func rebindQuery(query string) string {
 }
 
 func saveMessage(msg *Message) error {
-	if dbDialect == "postgres" {
-		_, err := dbExec(`
-			INSERT INTO messages
-			(id, source_email, account_id, subject, from_addr, to_addr, date, body, body_html,
-			 status, target_type, target_name, retry_count, error_message, created_at, sent_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (id) DO UPDATE SET
-				source_email = EXCLUDED.source_email,
-				account_id = EXCLUDED.account_id,
-				subject = EXCLUDED.subject,
-				from_addr = EXCLUDED.from_addr,
-				to_addr = EXCLUDED.to_addr,
-				date = EXCLUDED.date,
-				body = EXCLUDED.body,
-				body_html = EXCLUDED.body_html,
-				status = EXCLUDED.status,
-				target_type = EXCLUDED.target_type,
-				target_name = EXCLUDED.target_name,
-				retry_count = EXCLUDED.retry_count,
-				error_message = EXCLUDED.error_message,
-				created_at = EXCLUDED.created_at,
-				sent_at = EXCLUDED.sent_at
-		`, msg.ID, msg.SourceEmail, msg.AccountID, msg.Subject, msg.From, msg.To, msg.Date,
-			msg.Body, msg.BodyHTML, msg.Status, msg.TargetType, msg.TargetName,
-			msg.RetryCount, msg.ErrorMessage, msg.CreatedAt, msg.SentAt)
-		return err
-	}
 	_, err := dbExec(`
-		INSERT OR REPLACE INTO messages
+		INSERT INTO messages
 		(id, source_email, account_id, subject, from_addr, to_addr, date, body, body_html,
 		 status, target_type, target_name, retry_count, error_message, created_at, sent_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET
+			source_email = EXCLUDED.source_email,
+			account_id = EXCLUDED.account_id,
+			subject = EXCLUDED.subject,
+			from_addr = EXCLUDED.from_addr,
+			to_addr = EXCLUDED.to_addr,
+			date = EXCLUDED.date,
+			body = EXCLUDED.body,
+			body_html = EXCLUDED.body_html,
+			status = EXCLUDED.status,
+			target_type = EXCLUDED.target_type,
+			target_name = EXCLUDED.target_name,
+			retry_count = EXCLUDED.retry_count,
+			error_message = EXCLUDED.error_message,
+			created_at = EXCLUDED.created_at,
+			sent_at = EXCLUDED.sent_at
 	`, msg.ID, msg.SourceEmail, msg.AccountID, msg.Subject, msg.From, msg.To, msg.Date,
 		msg.Body, msg.BodyHTML, msg.Status, msg.TargetType, msg.TargetName,
 		msg.RetryCount, msg.ErrorMessage, msg.CreatedAt, msg.SentAt)
@@ -253,7 +188,6 @@ func tryParseTime(s string) time.Time {
 	if s == "" {
 		return time.Time{}
 	}
-	// 尝试常见的 SQLite 时间格式
 	formats := []string{
 		time.RFC3339Nano,
 		time.RFC3339,
@@ -306,11 +240,7 @@ func getMessageStats() (map[string]int, error) {
 }
 
 func deleteOldMessages(days int) error {
-	if dbDialect == "postgres" {
-		_, err := dbExec(`DELETE FROM messages WHERE created_at < NOW() - (? || ' days')::interval`, days)
-		return err
-	}
-	_, err := dbExec(`DELETE FROM messages WHERE created_at < datetime('now', ?)`, fmt.Sprintf("-%d days", days))
+	_, err := dbExec(`DELETE FROM messages WHERE created_at < NOW() - (? || ' days')::interval`, days)
 	return err
 }
 

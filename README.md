@@ -8,7 +8,7 @@ All2Webhook 是一个使用 Go 编写的通知集合转发服务。它保留 IMA
 - 双端口隔离：`8080` 用于 Web 管理界面，`8081` 只用于公开接收通知。
 - 多目标转发：一条转发规则可以同时发送到多个飞书、钉钉、企业微信、Slack、Discord 或自定义 Webhook。
 - 自动解析：优先解析常见 JSON 与 GitHub Webhook；无法识别时保留完整请求内容，避免漏通知。
-- PostgreSQL 支持：Docker Compose 默认启动 PostgreSQL；未配置 `DATABASE_URL` 时可回退 SQLite。
+- PostgreSQL 存储：服务仅支持 PostgreSQL，Docker Compose 默认启动并配置数据库。
 - 邮件兼容：仍支持 IMAP 拉取邮件并复用原有过滤、格式化和转发能力。
 
 ## Docker Compose 启动
@@ -47,12 +47,12 @@ curl -X POST 'https://all2webhook.example.com/hook/<secret>' \
 
 ## 本地开发
 
-需要 Go 1.21 或更新版本。
+需要 Go 1.21 或更新版本，并准备可访问的 PostgreSQL 数据库。
 
 ```bash
 go mod download
 go test ./...
-go run .
+DATABASE_URL='postgres://all2webhook:all2webhook_password@localhost:5432/all2webhook?sslmode=disable' go run .
 ```
 
 默认本地运行端口：
@@ -60,8 +60,4 @@ go run .
 - 管理端口：`8080`
 - 公开接收端口：`8081`
 
-如需使用 PostgreSQL，设置 `DATABASE_URL`：
-
-```bash
-DATABASE_URL='postgres://all2webhook:all2webhook_password@localhost:5432/all2webhook?sslmode=disable' go run .
-```
+未设置 `DATABASE_URL` 时服务会直接退出。
