@@ -15,12 +15,16 @@ All2Webhook 是一个使用 Go 编写的通知集合转发服务。它保留 IMA
 
 ```bash
 cd all2webhook
+修改compose文件的公开地址
 docker compose up -d --build
 ```
 
 访问地址：
 
 - 管理界面：`http://localhost:8080`
+
+  **注意！！管理页面没有做任何鉴权，请勿对外开放此端口**
+
 - 公开接收地址：`https://all2webhook.example.com`
 
 部署前请把 `docker-compose.yml` 中的 `PUBLIC_BASE_URL` 改成自己的实际域名；接收项目生成的 URL 会使用这个域名。
@@ -50,7 +54,7 @@ curl -X POST 'https://all2webhook.example.com/hook/<secret>' \
 在管理界面的“邮箱账号”中添加 IMAP 账号后，可以点击“获取可用文件夹”读取邮箱服务器返回的文件夹列表，并在“监听文件夹”中填写一个或多个文件夹名称，多个文件夹用英文逗号分隔，例如：
 
 ```text
-INBOX, 其他文件夹/深信服APT威胁检测系统
+INBOX,OTHER/测试通知
 ```
 
 邮件拉取逻辑会按账号配置的检查间隔扫描这些文件夹中的未读邮件。每个文件夹独立建立 IMAP 连接，使用 UID 去重，并且每轮最多处理最新 10 封未读邮件，避免一次性转发过多历史邮件。
