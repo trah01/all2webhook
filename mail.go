@@ -239,14 +239,6 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 		return
 	}
 
-	// 首次扫描该文件夹时，记录启动基线时间（防止大量历史邮件涌入）
-	folderKey := fmt.Sprintf("%s:%s", account.ID, folder)
-	if _, hasBaseline := folderFirstSeen.Load(folderKey); !hasBaseline {
-		folderFirstSeen.Store(folderKey, time.Now())
-	}
-	baseline, _ := folderFirstSeen.Load(folderKey)
-	baselineTime := baseline.(time.Time)
-
 	criteria := imap.NewSearchCriteria()
 	criteria.WithoutFlags = []string{imap.SeenFlag}
 	uids, searchErr := c.UidSearch(criteria)
@@ -306,31 +298,6 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 		from := ""
 		if len(msg.Envelope.From) > 0 {
 			from = msg.Envelope.From[0].Address()
-		}
-
-		// 忽略基线时刻之前的旧未读邮件（使用 IMAP InternalDate 即服务器收件时间，
-		// 而非 Envelope.Date，因为自动通知邮件的 Date 头可能远早于实际投递时间）
-		receivedTime := msg.InternalDate
-		if receivedTime.IsZero() {
-			receivedTime = msg.Envelope.Date // 兜底
-		}
-		if receivedTime.Before(baselineTime) {
-			ignoredMsg := &Message{
-				ID:          msgID,
-				SourceEmail: account.EmailUser,
-				AccountID:   account.ID,
-				Subject:     msg.Envelope.Subject,
-				From:        from,
-				To:          account.EmailUser,
-				Date:        msg.Envelope.Date,
-				Status:      "ignored",
-				CreatedAt:   time.Now(),
-			}
-			if err := saveMessage(ignoredMsg); err != nil {
-				addLog(fmt.Sprintf("记录旧邮件忽略状态失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, err), "error")
-			}
-			addLog(fmt.Sprintf("忽略启动前旧未读邮件 [%s/%s uid=%d]: %s", account.Name, folder, uid, displaySubject(msg.Envelope.Subject)), "info")
-			continue
 		}
 
 		r := msg.GetBody(&section)
