@@ -76,10 +76,11 @@ func TestFormatPlainTextBody_FirstLineUsesTwoSpaceIndent(t *testing.T) {
 
 func TestApplyFilterRules_BlacklistBlocksSender(t *testing.T) {
 	msg := &Message{From: "newsletter@example.com", Subject: "周报", Body: "正文"}
+	ctx := filterContext{DisplaySender: msg.From}
 	rules := map[string]FilterRule{
 		"filter_1": {
 			ID:       "filter_1",
-			Name:     "屏蔽发信人",
+			Name:     "屏蔽发送人",
 			Type:     "sender",
 			Mode:     "blacklist",
 			Patterns: []string{"example.com"},
@@ -87,7 +88,7 @@ func TestApplyFilterRules_BlacklistBlocksSender(t *testing.T) {
 		},
 	}
 
-	got := applyFilterRules([]string{"filter_1"}, rules, msg)
+	got := applyFilterRules([]string{"filter_1"}, rules, msg, ctx)
 
 	if got.Allowed {
 		t.Fatalf("expected blacklist sender rule to block message")
@@ -96,6 +97,7 @@ func TestApplyFilterRules_BlacklistBlocksSender(t *testing.T) {
 
 func TestApplyFilterRules_WhitelistRequiresContentMatch(t *testing.T) {
 	msg := &Message{From: "notice@example.com", Subject: "普通通知", Body: "没有关键词"}
+	ctx := filterContext{DisplaySender: msg.From}
 	rules := map[string]FilterRule{
 		"filter_1": {
 			ID:       "filter_1",
@@ -107,16 +109,46 @@ func TestApplyFilterRules_WhitelistRequiresContentMatch(t *testing.T) {
 		},
 	}
 
-	got := applyFilterRules([]string{"filter_1"}, rules, msg)
+	got := applyFilterRules([]string{"filter_1"}, rules, msg, ctx)
 
 	if got.Allowed {
 		t.Fatalf("expected whitelist content rule to block unmatched message")
 	}
 
 	msg.Subject = "本月账单"
-	got = applyFilterRules([]string{"filter_1"}, rules, msg)
+	got = applyFilterRules([]string{"filter_1"}, rules, msg, ctx)
 	if !got.Allowed {
 		t.Fatalf("expected whitelist content rule to allow matched message: %s", got.Reason)
+	}
+}
+
+func TestApplyFilterRules_WebhookSourceMatchesProject(t *testing.T) {
+	msg := &Message{
+		AccountID:   "proj_1",
+		SourceEmail: "GitHub 项目",
+		From:        "github",
+		Subject:     "GitHub push",
+		Body:        "main 分支已更新",
+	}
+	ctx := filterContext{
+		SourceType:    "webhook",
+		SourceName:    msg.SourceEmail,
+		DisplaySender: "webhook转发",
+	}
+	rules := map[string]FilterRule{
+		"filter_1": {
+			ID:       "filter_1",
+			Name:     "只允许 GitHub 项目",
+			Type:     "source",
+			Mode:     "whitelist",
+			Patterns: []string{"github"},
+			Enabled:  true,
+		},
+	}
+
+	got := applyFilterRules([]string{"filter_1"}, rules, msg, ctx)
+	if !got.Allowed {
+		t.Fatalf("expected webhook source rule to allow matched project: %s", got.Reason)
 	}
 }
 

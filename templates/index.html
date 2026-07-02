@@ -525,8 +525,10 @@
                         <div class="form-group">
                             <label class="form-label">过滤对象</label>
                             <select class="form-input" id="filter-type">
-                                <option value="sender">发信人</option>
-                                <option value="content">邮件内容</option>
+                                <option value="sender">发送人</option>
+                                <option value="source">来源</option>
+                                <option value="content">标题与内容</option>
+                                <option value="all">全部字段</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -538,7 +540,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">匹配内容 (每行一条，支持邮箱、域名、关键词)</label>
+                        <label class="form-label">匹配内容 (每行一条，支持邮箱、域名、项目名、关键词)</label>
                         <textarea class="form-input" id="filter-patterns" rows="5" placeholder="newsletter@example.com
 unsubscribe
 退订"></textarea>

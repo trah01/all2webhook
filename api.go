@@ -366,7 +366,7 @@ func setupAPI(r *gin.Engine) {
 	r.DELETE("/api/filters/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		if id == DefaultSenderBlacklistID || id == DefaultSenderWhitelistID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "默认发件人过滤规则不能删除"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "默认发送人过滤规则不能删除"})
 			return
 		}
 		configLock.Lock()

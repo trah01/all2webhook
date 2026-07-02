@@ -12,7 +12,7 @@ const filterTemplates = [
         patterns: ['验证码', '校验码', '动态码', 'verification code', 'security code', 'auth code']
     },
     {
-        name: '屏蔽自动发信人',
+        name: '屏蔽自动发送人',
         type: 'sender',
         mode: 'blacklist',
         patterns: ['no-reply@', 'noreply@', 'notification@', 'newsletter@']
@@ -28,6 +28,18 @@ const filterTemplates = [
         type: 'content',
         mode: 'blacklist',
         patterns: ['cron', 'debug', 'heartbeat', 'health check', '监控恢复', '测试通知']
+    },
+    {
+        name: '只转发 Webhook 通知',
+        type: 'source',
+        mode: 'whitelist',
+        patterns: ['webhook']
+    },
+    {
+        name: '屏蔽 Webhook 测试通知',
+        type: 'all',
+        mode: 'blacklist',
+        patterns: ['test', '测试', 'debug', 'heartbeat']
     },
     {
         name: '只转发账单发票',

@@ -4,7 +4,7 @@ All2Webhook 是一个使用 Go 编写的通知集合转发服务。它保留 IMA
 
 ## 核心能力
 
-- 统一接收入口：每个接收项目生成高强度密钥 URL，例如 `http://localhost:8081/hook/<secret>`。
+- 统一接收入口：每个接收项目生成高强度密钥 URL，例如 `https://all2webhook.example.com/hook/<secret>`。
 - 双端口隔离：`8080` 用于 Web 管理界面，`8081` 只用于公开接收通知。
 - 多目标转发：一条转发规则可以同时发送到多个飞书、钉钉、企业微信、Slack、Discord 或自定义 Webhook。
 - 自动解析：优先解析常见 JSON 与 GitHub Webhook；无法识别时保留完整请求内容，避免漏通知。
@@ -21,7 +21,9 @@ docker compose up -d --build
 访问地址：
 
 - 管理界面：`http://localhost:8080`
-- 公开接收端口：`http://localhost:8081`
+- 公开接收地址：`https://all2webhook.example.com`
+
+部署前请把 `docker-compose.yml` 中的 `PUBLIC_BASE_URL` 改成自己的实际域名；接收项目生成的 URL 会使用这个域名。
 
 查看状态和日志：
 
@@ -36,7 +38,7 @@ docker compose logs -f postgres
 在管理界面的“接收项目”中创建项目后，复制生成的接收 URL：
 
 ```bash
-curl -X POST 'http://localhost:8081/hook/<secret>' \
+curl -X POST 'https://all2webhook.example.com/hook/<secret>' \
   -H 'Content-Type: application/json' \
   -d '{"title":"部署完成","message":"生产环境发布成功"}'
 ```

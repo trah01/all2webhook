@@ -38,7 +38,7 @@
   "filter_rules": [
     {
       "id": "default_sender_blacklist",
-      "name": "默认发件人黑名单",
+      "name": "默认发送人黑名单",
       "type": "sender",
       "mode": "blacklist",
       "patterns": [],
@@ -46,7 +46,7 @@
     },
     {
       "id": "default_sender_whitelist",
-      "name": "默认发件人白名单",
+      "name": "默认发送人白名单",
       "type": "sender",
       "mode": "whitelist",
       "patterns": [],

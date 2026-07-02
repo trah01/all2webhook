@@ -37,7 +37,7 @@ func sendToFeishu(webhookURL, subject, from, date, body string) error {
 		if isFirst {
 			elements = append(elements, map[string]interface{}{
 				"tag":  "div",
-				"text": map[string]interface{}{"tag": "lark_md", "content": fmt.Sprintf("**主题：** %s\n**发件人：** %s\n**时间：** %s", subject, from, date)},
+				"text": map[string]interface{}{"tag": "lark_md", "content": fmt.Sprintf("**主题：** %s\n**发送人：** %s\n**时间：** %s", subject, from, date)},
 			})
 			elements = append(elements, map[string]interface{}{"tag": "hr"})
 		}
@@ -100,7 +100,7 @@ func sendToSlack(webhookURL, subject, from, date, body string) error {
 			{
 				"type": "section",
 				"fields": []map[string]interface{}{
-					{"type": "mrkdwn", "text": fmt.Sprintf("*发件人:*\n%s", from)},
+					{"type": "mrkdwn", "text": fmt.Sprintf("*发送人:*\n%s", from)},
 					{"type": "mrkdwn", "text": fmt.Sprintf("*时间:*\n%s", date)},
 				},
 			},
@@ -141,7 +141,7 @@ func sendToDiscord(webhookURL, subject, from, date, body string) error {
 				"description": body,
 				"color":       3447003,
 				"fields": []map[string]interface{}{
-					{"name": "发件人", "value": from, "inline": true},
+					{"name": "发送人", "value": from, "inline": true},
 					{"name": "时间", "value": date, "inline": true},
 				},
 				"footer": map[string]interface{}{
@@ -191,7 +191,7 @@ func sendToDingTalk(webhookURL, subject, from, date, body string) error {
 		"msgtype": "markdown",
 		"markdown": map[string]interface{}{
 			"title": subject,
-			"text":  fmt.Sprintf("### %s\n**发件人:** %s\n**时间:** %s\n\n%s", subject, from, date, body),
+			"text":  fmt.Sprintf("### %s\n**发送人:** %s\n**时间:** %s\n\n%s", subject, from, date, body),
 		},
 	}
 	jsonBody, _ := json.Marshal(payload)
@@ -208,7 +208,7 @@ func sendToDingTalk(webhookURL, subject, from, date, body string) error {
 }
 
 func sendToWeCom(webhookURL, subject, from, date, body string) error {
-	fullText := fmt.Sprintf("### %s\n**发件人:** %s\n**时间:** %s\n\n%s", subject, from, date, body)
+	fullText := fmt.Sprintf("### %s\n**发送人:** %s\n**时间:** %s\n\n%s", subject, from, date, body)
 	runes := []rune(fullText)
 	if len(runes) > 1300 {
 		fullText = string(runes[:1300]) + "..."

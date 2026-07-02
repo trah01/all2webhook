@@ -497,7 +497,7 @@ function renderFilters() {
     tbody.innerHTML = filterRules.map(rule => `
         <tr>
             <td><strong>${escapeHtml(rule.name)}</strong></td>
-            <td>${rule.type === 'content' ? '邮件内容' : '发信人'}</td>
+            <td>${displayFilterType(rule.type)}</td>
             <td><span class="tag ${rule.mode === 'blacklist' ? 'tag-warning' : 'tag-info'}">${rule.mode === 'blacklist' ? '黑名单' : '白名单'}</span></td>
             <td>${rule.patterns?.length ? rule.patterns.slice(0, 4).map(p => `<span class="tag tag-neutral">${escapeHtml(p)}</span>`).join(' ') : '无'}${rule.patterns?.length > 4 ? ' ...' : ''}</td>
             <td>
@@ -518,7 +518,7 @@ function renderFilterTemplates() {
     if (!container) return;
 
     container.innerHTML = filterTemplates.map((template, index) => {
-        const typeName = template.type === 'content' ? '邮件内容' : '发信人';
+        const typeName = displayFilterType(template.type);
         const modeName = template.mode === 'blacklist' ? '黑名单' : '白名单';
         return `
             <button class="template-card" type="button" onclick="applyFilterTemplate(${index})">
@@ -527,6 +527,19 @@ function renderFilterTemplates() {
             </button>
         `;
     }).join('');
+}
+
+function displayFilterType(type) {
+    switch (type) {
+        case 'content':
+            return '标题与内容';
+        case 'source':
+            return '来源';
+        case 'all':
+            return '全部字段';
+        default:
+            return '发送人';
+    }
 }
 
 function applyFilterTemplate(index) {
@@ -599,12 +612,12 @@ async function deleteFilter(id) {
 async function addSenderToDefaultFilter(sender, mode) {
     sender = (sender || '').trim();
     if (!sender) {
-        await showAppAlert('发件人为空，无法加入过滤规则', { type: 'warning', title: '无法操作' });
+        await showAppAlert('发送人为空，无法加入过滤规则', { type: 'warning', title: '无法操作' });
         return;
     }
 
     const modeName = mode === 'blacklist' ? '黑名单' : '白名单';
-    if (!(await showAppConfirm(`确定将 ${sender} 加入默认发件人${modeName}吗？`, { title: `加入${modeName}`, confirmText: '加入' }))) return;
+    if (!(await showAppConfirm(`确定将 ${sender} 加入默认发送人${modeName}吗？`, { title: `加入${modeName}`, confirmText: '加入' }))) return;
 
     try {
         const result = await api('POST', '/api/filters/default-senders', { mode, sender });
@@ -612,7 +625,7 @@ async function addSenderToDefaultFilter(sender, mode) {
             await showAppAlert('操作失败: ' + result.error, { type: 'error', title: '操作失败' });
             return;
         }
-        await showAppAlert(result.added ? `已加入默认发件人${modeName}` : `该发件人已在默认发件人${modeName}中`, { type: 'success', title: '操作完成' });
+        await showAppAlert(result.added ? `已加入默认发送人${modeName}` : `该发送人已在默认发送人${modeName}中`, { type: 'success', title: '操作完成' });
         loadFilters();
     } catch (e) {
         await showAppAlert('操作失败: ' + e.message, { type: 'error', title: '操作失败' });

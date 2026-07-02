@@ -61,7 +61,8 @@ func processPendingMessages() {
 				continue
 			}
 
-			filterResult := applyFilterRules(rule.FilterRuleIDs, filterRules, &msg)
+			filterCtx := buildFilterContext(&msg, accounts)
+			filterResult := applyFilterRules(rule.FilterRuleIDs, filterRules, &msg, filterCtx)
 			if !filterResult.Allowed {
 				filterBlocked = true
 				addLog(fmt.Sprintf("消息被过滤规则拦截 [%s]: %s", displaySubject(msg.Subject), filterResult.Reason), "info")
@@ -80,6 +81,7 @@ func processPendingMessages() {
 			var sendErr error
 			dateStr := msg.Date.Format("2006-01-02 15:04:05")
 			subjectForSend := displaySubject(msg.Subject)
+			senderForSend := filterCtx.DisplaySender
 
 			// 智能提取验证码并高亮前置
 			displayBody := msg.Body
@@ -104,17 +106,17 @@ func processPendingMessages() {
 
 				switch webhook.Type {
 				case "feishu":
-					sendErr = sendToFeishu(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+					sendErr = sendToFeishu(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "dingtalk":
-					sendErr = sendToDingTalk(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+					sendErr = sendToDingTalk(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "wecom":
-					sendErr = sendToWeCom(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+					sendErr = sendToWeCom(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "slack":
-					sendErr = sendToSlack(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+					sendErr = sendToSlack(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "discord":
-					sendErr = sendToDiscord(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+					sendErr = sendToDiscord(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "custom":
-					sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+					sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				default:
 					sendErr = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
 				}
@@ -163,6 +165,21 @@ func processPendingMessages() {
 				addLog(fmt.Sprintf("消息无匹配规则 [%s] account=%s", displaySubject(msg.Subject), msg.AccountID), "warning")
 			}
 		}
+	}
+}
+
+func buildFilterContext(msg *Message, accounts map[string]EmailAccount) filterContext {
+	if account, ok := accounts[msg.AccountID]; ok {
+		return filterContext{
+			SourceType:    "mail",
+			SourceName:    firstNonEmpty(account.Name, account.EmailUser, msg.SourceEmail, msg.AccountID),
+			DisplaySender: firstNonEmpty(msg.From, account.EmailUser, msg.SourceEmail),
+		}
+	}
+	return filterContext{
+		SourceType:    "webhook",
+		SourceName:    firstNonEmpty(msg.SourceEmail, msg.AccountID),
+		DisplaySender: "webhook转发",
 	}
 }
 

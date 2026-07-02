@@ -8,16 +8,27 @@ import (
 const (
 	DefaultSenderBlacklistID = "default_sender_blacklist"
 	DefaultSenderWhitelistID = "default_sender_whitelist"
+
+	filterTypeSender  = "sender"
+	filterTypeContent = "content"
+	filterTypeSource  = "source"
+	filterTypeAll     = "all"
 )
 
 // FilterRule 是独立的邮件过滤规则，可被多个转发规则复用。
 type FilterRule struct {
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`
-	Type     string   `json:"type"` // "sender", "content"
+	Type     string   `json:"type"` // "sender", "content", "source", "all"
 	Mode     string   `json:"mode"` // "whitelist", "blacklist"
 	Patterns []string `json:"patterns"`
 	Enabled  bool     `json:"enabled"`
+}
+
+type filterContext struct {
+	SourceType    string
+	SourceName    string
+	DisplaySender string
 }
 
 type filterResult struct {
@@ -28,8 +39,10 @@ type filterResult struct {
 func normalizeFilterRule(rule FilterRule) FilterRule {
 	rule.Type = strings.ToLower(strings.TrimSpace(rule.Type))
 	rule.Mode = strings.ToLower(strings.TrimSpace(rule.Mode))
-	if rule.Type != "content" {
-		rule.Type = "sender"
+	switch rule.Type {
+	case filterTypeContent, filterTypeSource, filterTypeAll:
+	default:
+		rule.Type = filterTypeSender
 	}
 	if rule.Mode != "blacklist" {
 		rule.Mode = "whitelist"
@@ -56,16 +69,16 @@ func normalizeFilterRule(rule FilterRule) FilterRule {
 func ensureDefaultSenderFilterRulesNoLock() {
 	ensureDefaultFilterRuleNoLock(FilterRule{
 		ID:       DefaultSenderBlacklistID,
-		Name:     "默认发件人黑名单",
-		Type:     "sender",
+		Name:     "默认发送人黑名单",
+		Type:     filterTypeSender,
 		Mode:     "blacklist",
 		Patterns: []string{},
 		Enabled:  true,
 	})
 	ensureDefaultFilterRuleNoLock(FilterRule{
 		ID:       DefaultSenderWhitelistID,
-		Name:     "默认发件人白名单",
-		Type:     "sender",
+		Name:     "默认发送人白名单",
+		Type:     filterTypeSender,
 		Mode:     "whitelist",
 		Patterns: []string{},
 		Enabled:  true,
@@ -116,7 +129,7 @@ func addSenderToDefaultFilterRuleNoLock(mode string, sender string) (FilterRule,
 	return FilterRule{}, false
 }
 
-func applyFilterRules(ids []string, rules map[string]FilterRule, msg *Message) filterResult {
+func applyFilterRules(ids []string, rules map[string]FilterRule, msg *Message, ctx filterContext) filterResult {
 	for _, id := range ids {
 		rule, ok := rules[id]
 		if !ok || !rule.Enabled {
@@ -126,7 +139,7 @@ func applyFilterRules(ids []string, rules map[string]FilterRule, msg *Message) f
 		if len(rule.Patterns) == 0 {
 			continue
 		}
-		if !filterRuleAllows(rule, msg) {
+		if !filterRuleAllows(rule, msg, ctx) {
 			return filterResult{
 				Allowed: false,
 				Reason:  fmt.Sprintf("%s(%s)", displayFilterRuleName(rule), displayFilterMode(rule.Mode)),
@@ -136,8 +149,8 @@ func applyFilterRules(ids []string, rules map[string]FilterRule, msg *Message) f
 	return filterResult{Allowed: true}
 }
 
-func filterRuleAllows(rule FilterRule, msg *Message) bool {
-	text := filterMatchText(rule, msg)
+func filterRuleAllows(rule FilterRule, msg *Message, ctx filterContext) bool {
+	text := filterMatchText(rule, msg, ctx)
 	matched := containsAnyFold(text, rule.Patterns)
 	switch rule.Mode {
 	case "blacklist":
@@ -147,11 +160,34 @@ func filterRuleAllows(rule FilterRule, msg *Message) bool {
 	}
 }
 
-func filterMatchText(rule FilterRule, msg *Message) string {
-	if rule.Type == "content" {
+func filterMatchText(rule FilterRule, msg *Message, ctx filterContext) string {
+	switch rule.Type {
+	case filterTypeContent:
 		return msg.Subject + "\n" + msg.Body
+	case filterTypeSource:
+		return strings.Join([]string{
+			ctx.SourceType,
+			ctx.SourceName,
+			msg.SourceEmail,
+			msg.AccountID,
+		}, "\n")
+	case filterTypeAll:
+		return strings.Join([]string{
+			ctx.DisplaySender,
+			msg.From,
+			ctx.SourceType,
+			ctx.SourceName,
+			msg.SourceEmail,
+			msg.AccountID,
+			msg.Subject,
+			msg.Body,
+		}, "\n")
+	default:
+		return strings.Join([]string{
+			ctx.DisplaySender,
+			msg.From,
+		}, "\n")
 	}
-	return msg.From
 }
 
 func containsAnyFold(text string, patterns []string) bool {
