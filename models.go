@@ -32,7 +32,6 @@ type ForwardRule struct {
 	Name          string   `json:"name"`
 	SourceAccount string   `json:"source_account"`  // 邮箱账号ID，"all" 表示所有
 	TargetWebhook string   `json:"target_webhook"`  // Webhook目标ID
-	Filters       []string `json:"filters"`         // 主题关键词过滤
 	FilterRuleIDs []string `json:"filter_rule_ids"` // 独立过滤规则ID
 	Enabled       bool     `json:"enabled"`
 }

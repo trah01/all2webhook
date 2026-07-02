@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+const (
+	DefaultSenderBlacklistID = "default_sender_blacklist"
+	DefaultSenderWhitelistID = "default_sender_whitelist"
+)
+
 // FilterRule 是独立的邮件过滤规则，可被多个转发规则复用。
 type FilterRule struct {
 	ID       string   `json:"id"`
@@ -46,6 +51,69 @@ func normalizeFilterRule(rule FilterRule) FilterRule {
 	}
 	rule.Patterns = patterns
 	return rule
+}
+
+func ensureDefaultSenderFilterRulesNoLock() {
+	ensureDefaultFilterRuleNoLock(FilterRule{
+		ID:       DefaultSenderBlacklistID,
+		Name:     "默认发件人黑名单",
+		Type:     "sender",
+		Mode:     "blacklist",
+		Patterns: []string{},
+		Enabled:  true,
+	})
+	ensureDefaultFilterRuleNoLock(FilterRule{
+		ID:       DefaultSenderWhitelistID,
+		Name:     "默认发件人白名单",
+		Type:     "sender",
+		Mode:     "whitelist",
+		Patterns: []string{},
+		Enabled:  true,
+	})
+}
+
+func ensureDefaultFilterRuleNoLock(rule FilterRule) {
+	rule = normalizeFilterRule(rule)
+	for i, existing := range config.FilterRules {
+		if existing.ID == rule.ID {
+			existing.Name = rule.Name
+			existing.Type = rule.Type
+			existing.Mode = rule.Mode
+			config.FilterRules[i] = normalizeFilterRule(existing)
+			return
+		}
+	}
+	config.FilterRules = append(config.FilterRules, rule)
+}
+
+func addSenderToDefaultFilterRuleNoLock(mode string, sender string) (FilterRule, bool) {
+	sender = strings.TrimSpace(sender)
+	if sender == "" {
+		return FilterRule{}, false
+	}
+
+	ruleID := DefaultSenderBlacklistID
+	if mode == "whitelist" {
+		ruleID = DefaultSenderWhitelistID
+	}
+	ensureDefaultSenderFilterRulesNoLock()
+
+	for i, rule := range config.FilterRules {
+		if rule.ID != ruleID {
+			continue
+		}
+		rule = normalizeFilterRule(rule)
+		for _, pattern := range rule.Patterns {
+			if strings.EqualFold(pattern, sender) {
+				config.FilterRules[i] = rule
+				return rule, false
+			}
+		}
+		rule.Patterns = append(rule.Patterns, sender)
+		config.FilterRules[i] = normalizeFilterRule(rule)
+		return config.FilterRules[i], true
+	}
+	return FilterRule{}, false
 }
 
 func applyFilterRules(ids []string, rules map[string]FilterRule, msg *Message) filterResult {

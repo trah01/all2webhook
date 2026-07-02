@@ -28,21 +28,25 @@
       "name": "转发全部",
       "source_account": "all",
       "target_webhook": "wh_17700000000",
-      "filters": [],
       "filter_rule_ids": [],
       "enabled": true
     }
   ],
   "filter_rules": [
     {
-      "id": "filter_17700000000",
-      "name": "屏蔽营销邮件",
-      "type": "content",
+      "id": "default_sender_blacklist",
+      "name": "默认发件人黑名单",
+      "type": "sender",
       "mode": "blacklist",
-      "patterns": [
-        "unsubscribe",
-        "退订"
-      ],
+      "patterns": [],
+      "enabled": true
+    },
+    {
+      "id": "default_sender_whitelist",
+      "name": "默认发件人白名单",
+      "type": "sender",
+      "mode": "whitelist",
+      "patterns": [],
       "enabled": true
     }
   ],

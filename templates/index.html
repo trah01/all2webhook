@@ -261,7 +261,7 @@
                                     <th>规则名称</th>
                                     <th>源邮箱</th>
                                     <th>目标 Webhook</th>
-                                    <th>关键词过滤</th>
+                                    <th>过滤规则</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>
@@ -522,10 +522,6 @@ unsubscribe
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">关键词过滤 (逗号分隔，留空表示不过滤)</label>
-                        <input type="text" class="form-input" id="rule-filters" placeholder="重要, 紧急, 报告">
-                    </div>
-                    <div class="form-group">
                         <label class="form-label">应用过滤规则</label>
                         <div class="filter-dropdown" id="rule-filter-dropdown">
                             <button class="filter-dropdown-trigger" type="button"
@@ -554,6 +550,31 @@ unsubscribe
         </div>
     </div>
 
+    <!-- App Dialog -->
+    <div id="app-dialog" class="app-dialog-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="app-dialog">
+            <div class="app-dialog-header">
+                <div class="app-dialog-icon" id="app-dialog-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                </div>
+                <div class="app-dialog-copy">
+                    <h3 id="app-dialog-title">提示</h3>
+                    <p id="app-dialog-message"></p>
+                </div>
+            </div>
+            <div class="app-dialog-actions">
+                <button class="btn btn-secondary" id="app-dialog-cancel" type="button">取消</button>
+                <button class="btn btn-primary" id="app-dialog-confirm" type="button">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/filter_templates.js"></script>
     <script src="/static/app.js"></script>
 
 </body>

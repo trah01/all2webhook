@@ -295,6 +295,10 @@ func setupAPI(r *gin.Engine) {
 
 	r.DELETE("/api/filters/:id", func(c *gin.Context) {
 		id := c.Param("id")
+		if id == DefaultSenderBlacklistID || id == DefaultSenderWhitelistID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "默认发件人过滤规则不能删除"})
+			return
+		}
 		configLock.Lock()
 		newFilters := make([]FilterRule, 0, len(config.FilterRules))
 		for _, f := range config.FilterRules {
@@ -309,6 +313,26 @@ func setupAPI(r *gin.Engine) {
 		saveConfigNoLock()
 		configLock.Unlock()
 		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	r.POST("/api/filters/default-senders", func(c *gin.Context) {
+		var req struct {
+			Mode   string `json:"mode"`
+			Sender string `json:"sender"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if req.Mode != "blacklist" && req.Mode != "whitelist" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "mode must be blacklist or whitelist"})
+			return
+		}
+		configLock.Lock()
+		rule, added := addSenderToDefaultFilterRuleNoLock(req.Mode, req.Sender)
+		saveConfigNoLock()
+		configLock.Unlock()
+		c.JSON(http.StatusOK, gin.H{"success": true, "added": added, "rule": rule})
 	})
 
 	// ===== 规则管理 =====

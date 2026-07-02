@@ -21,8 +21,12 @@ func loadConfig() {
 	if err == nil {
 		json.Unmarshal(data, &config)
 	} else {
+		ensureDefaultSenderFilterRulesNoLock()
 		saveConfigNoLock()
+		return
 	}
+	ensureDefaultSenderFilterRulesNoLock()
+	saveConfigNoLock()
 }
 
 func saveConfigNoLock() {

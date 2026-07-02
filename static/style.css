@@ -721,6 +721,100 @@ textarea.form-input {
     background: var(--bg-secondary);
 }
 
+/* ===================== App Dialog ===================== */
+.app-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 320;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.34);
+}
+
+.app-dialog-overlay.active {
+    display: flex;
+    animation: fadeIn 0.16s ease;
+}
+
+.app-dialog {
+    width: min(440px, 100%);
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-lg);
+}
+
+.app-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 22px 24px 18px;
+}
+
+.app-dialog-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: rgba(0, 122, 255, 0.12);
+    color: var(--accent);
+}
+
+.app-dialog-icon.success {
+    background: rgba(52, 199, 89, 0.12);
+    color: var(--success);
+}
+
+.app-dialog-icon.error {
+    background: rgba(255, 59, 48, 0.12);
+    color: var(--error);
+}
+
+.app-dialog-icon.warning {
+    background: rgba(255, 149, 0, 0.12);
+    color: #c93400;
+}
+
+.app-dialog-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.app-dialog-copy {
+    min-width: 0;
+}
+
+.app-dialog-copy h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 650;
+}
+
+.app-dialog-copy p {
+    margin: 7px 0 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.app-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--divider);
+    background: var(--bg-secondary);
+}
+
 /* ===================== Log List ===================== */
 .log-list {
     max-height: 400px;
@@ -813,12 +907,22 @@ textarea.form-input {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 8px;
+    gap: 12px;
 }
 
 .history-subject {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 0.95rem;
+    min-width: 0;
+}
+
+.history-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .history-meta {
@@ -881,5 +985,15 @@ textarea.form-input {
 
     .template-grid {
         grid-template-columns: 1fr;
+    }
+
+    .history-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .history-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
     }
 }

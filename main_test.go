@@ -118,3 +118,34 @@ func TestApplyFilterRules_WhitelistRequiresContentMatch(t *testing.T) {
 		t.Fatalf("expected whitelist content rule to allow matched message: %s", got.Reason)
 	}
 }
+
+func TestAddSenderToDefaultFilterRuleNoLock_CreatesDefaultsAndDeduplicates(t *testing.T) {
+	oldConfig := config
+	t.Cleanup(func() {
+		config = oldConfig
+	})
+	config = Config{}
+
+	rule, added := addSenderToDefaultFilterRuleNoLock("blacklist", "spam@example.com")
+	if !added {
+		t.Fatalf("expected sender to be added")
+	}
+	if rule.ID != DefaultSenderBlacklistID {
+		t.Fatalf("expected blacklist rule, got %q", rule.ID)
+	}
+	if len(rule.Patterns) != 1 || rule.Patterns[0] != "spam@example.com" {
+		t.Fatalf("expected sender in blacklist patterns, got %#v", rule.Patterns)
+	}
+
+	rule, added = addSenderToDefaultFilterRuleNoLock("blacklist", "SPAM@example.com")
+	if added {
+		t.Fatalf("expected duplicate sender to be ignored")
+	}
+	if len(rule.Patterns) != 1 {
+		t.Fatalf("expected duplicate sender to keep one pattern, got %#v", rule.Patterns)
+	}
+
+	if len(config.FilterRules) != 2 {
+		t.Fatalf("expected both default sender rules to exist, got %d", len(config.FilterRules))
+	}
+}

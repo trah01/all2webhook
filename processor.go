@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -59,20 +58,6 @@ func processPendingMessages() {
 			// 检查源账号匹配
 			if rule.SourceAccount != "all" && rule.SourceAccount != msg.AccountID {
 				continue
-			}
-
-			// 检查关键词过滤
-			if len(rule.Filters) > 0 {
-				matched := false
-				for _, f := range rule.Filters {
-					if strings.Contains(strings.ToLower(msg.Subject), strings.ToLower(f)) {
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					continue
-				}
 			}
 
 			filterResult := applyFilterRules(rule.FilterRuleIDs, filterRules, &msg)

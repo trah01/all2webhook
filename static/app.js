@@ -6,44 +6,7 @@ let filterRules = [];
 let logs = [];
 let lastChecks = {};
 
-const filterTemplates = [
-    {
-        name: '屏蔽营销邮件',
-        type: 'content',
-        mode: 'blacklist',
-        patterns: ['unsubscribe', '退订', 'newsletter', 'promotion', '促销', '广告']
-    },
-    {
-        name: '只转发验证码',
-        type: 'content',
-        mode: 'whitelist',
-        patterns: ['验证码', '校验码', '动态码', 'verification code', 'security code', 'auth code']
-    },
-    {
-        name: '屏蔽自动发信人',
-        type: 'sender',
-        mode: 'blacklist',
-        patterns: ['no-reply@', 'noreply@', 'notification@', 'newsletter@']
-    },
-    {
-        name: '只允许指定域名',
-        type: 'sender',
-        mode: 'whitelist',
-        patterns: ['@example.com']
-    },
-    {
-        name: '屏蔽系统噪音',
-        type: 'content',
-        mode: 'blacklist',
-        patterns: ['cron', 'debug', 'heartbeat', 'health check', '监控恢复', '测试通知']
-    },
-    {
-        name: '只转发账单发票',
-        type: 'content',
-        mode: 'whitelist',
-        patterns: ['账单', '发票', 'invoice', 'receipt', 'payment']
-    }
-];
+const defaultSenderFilterIDs = new Set(['default_sender_blacklist', 'default_sender_whitelist']);
 
 // ===================== Navigation =====================
 document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -277,7 +240,7 @@ async function saveAccount() {
         loadAccounts();
         loadStats();
     } catch (e) {
-        alert('保存失败: ' + e.message);
+        await showAppAlert('保存失败: ' + e.message, { type: 'error', title: '保存失败' });
     }
 }
 
@@ -291,7 +254,7 @@ async function testAccountFolders() {
         const data = getAccountFormData();
         const res = await api('POST', '/api/test-imap', data);
         if (res.error) {
-            alert('获取失败: ' + res.error);
+            await showAppAlert('获取失败: ' + res.error, { type: 'error', title: '获取失败' });
         } else if (res.folders) {
             const container = document.getElementById('folder-checkboxes');
             container.style.display = 'flex';
@@ -340,7 +303,7 @@ async function testAccountFolders() {
             });
         }
     } catch (e) {
-        alert('网络或服务异常: ' + e.message);
+        await showAppAlert('网络或服务异常: ' + e.message, { type: 'error', title: '请求失败' });
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
@@ -352,12 +315,12 @@ async function testAccountConnectionModal() {
         const data = getAccountFormData();
         const res = await api('POST', '/api/test-imap', data);
         if (res.error) {
-            alert('连接测试失败: ' + res.error);
+            await showAppAlert('连接测试失败: ' + res.error, { type: 'error', title: '连接失败' });
         } else {
-            alert('当前配置连接测试成功！');
+            await showAppAlert('当前配置连接测试成功', { type: 'success', title: '连接成功' });
         }
     } catch (e) {
-        alert('网络异常: ' + e.message);
+        await showAppAlert('网络异常: ' + e.message, { type: 'error', title: '请求失败' });
     }
 }
 
@@ -367,23 +330,23 @@ async function testAccountConnectionInList(id) {
     try {
         const res = await api('POST', '/api/test-imap', acc);
         if (res.error) {
-            alert('连接测试失败: ' + res.error);
+            await showAppAlert('连接测试失败: ' + res.error, { type: 'error', title: '连接失败' });
         } else {
-            alert('账号连接测试成功！');
+            await showAppAlert('账号连接测试成功', { type: 'success', title: '连接成功' });
         }
     } catch (e) {
-        alert('网络异常: ' + e.message);
+        await showAppAlert('网络异常: ' + e.message, { type: 'error', title: '请求失败' });
     }
 }
 
 async function deleteAccount(id) {
-    if (!confirm('确定要删除此邮箱账号吗？')) return;
+    if (!(await showAppConfirm('确定要删除此邮箱账号吗？', { title: '删除邮箱账号', confirmText: '删除' }))) return;
     try {
         await api('DELETE', `/api/accounts/${id}`);
         loadAccounts();
         loadStats();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        await showAppAlert('删除失败: ' + e.message, { type: 'error', title: '删除失败' });
     }
 }
 
@@ -477,17 +440,17 @@ async function saveWebhook() {
         closeModal('webhook-modal');
         loadWebhooks();
     } catch (e) {
-        alert('保存失败: ' + e.message);
+        await showAppAlert('保存失败: ' + e.message, { type: 'error', title: '保存失败' });
     }
 }
 
 async function deleteWebhook(id) {
-    if (!confirm('确定要删除此 Webhook 吗？')) return;
+    if (!(await showAppConfirm('确定要删除此 Webhook 吗？', { title: '删除 Webhook', confirmText: '删除' }))) return;
     try {
         await api('DELETE', `/api/webhooks/${id}`);
         loadWebhooks();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        await showAppAlert('删除失败: ' + e.message, { type: 'error', title: '删除失败' });
     }
 }
 
@@ -495,12 +458,12 @@ async function testWebhook(id) {
     try {
         const result = await api('POST', `/api/webhooks/${id}/test`);
         if (result.success) {
-            alert('测试发送成功！');
+            await showAppAlert('测试发送成功', { type: 'success', title: '发送成功' });
         } else {
-            alert('测试发送失败: ' + result.error);
+            await showAppAlert('测试发送失败: ' + result.error, { type: 'error', title: '发送失败' });
         }
     } catch (e) {
-        alert('测试失败: ' + e.message);
+        await showAppAlert('测试失败: ' + e.message, { type: 'error', title: '测试失败' });
     }
 }
 
@@ -543,7 +506,7 @@ function renderFilters() {
             </td>
             <td>
                 <button class="btn btn-secondary btn-sm" onclick="editFilter('${rule.id}')">编辑</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteFilter('${rule.id}')">删除</button>
+                ${defaultSenderFilterIDs.has(rule.id) ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteFilter('${rule.id}')">删除</button>`}
             </td>
         </tr>
     `).join('');
@@ -617,18 +580,18 @@ async function saveFilter() {
         loadFilters();
         loadRules();
     } catch (e) {
-        alert('保存失败: ' + e.message);
+        await showAppAlert('保存失败: ' + e.message, { type: 'error', title: '保存失败' });
     }
 }
 
 async function deleteFilter(id) {
-    if (!confirm('确定要删除此过滤规则吗？相关转发规则会自动移除该引用。')) return;
+    if (!(await showAppConfirm('确定要删除此过滤规则吗？相关转发规则会自动移除该引用。', { title: '删除过滤规则', confirmText: '删除' }))) return;
     try {
         await api('DELETE', `/api/filters/${id}`);
         loadFilters();
         loadRules();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        await showAppAlert('删除失败: ' + e.message, { type: 'error', title: '删除失败' });
     }
 }
 
@@ -674,8 +637,7 @@ function renderRules() {
                 <td>${rule.source_account === 'all' ? '所有账号' : (acc?.name || '未知')}</td>
                 <td>${wh?.name || '未知'}</td>
                 <td>
-                    ${rule.filters?.length ? rule.filters.map(f => `<span class="tag tag-neutral">${escapeHtml(f)}</span>`).join(' ') : '无'}
-                    ${selectedFilters.length ? `<div style="margin-top: 6px;">${selectedFilters.map(f => `<span class="tag tag-info">${escapeHtml(f.name)}</span>`).join(' ')}</div>` : ''}
+                    ${selectedFilters.length ? selectedFilters.map(f => `<span class="tag tag-info">${escapeHtml(f.name)}</span>`).join(' ') : '无'}
                 </td>
                 <td>
                     <span class="tag ${rule.enabled ? 'tag-success' : 'tag-neutral'}">
@@ -705,7 +667,6 @@ function openRuleModal(data = null) {
     document.getElementById('rule-name').value = data?.name || '';
     document.getElementById('rule-source').value = data?.source_account || 'all';
     document.getElementById('rule-target').value = data?.target_webhook || '';
-    document.getElementById('rule-filters').value = (data?.filters || []).join(', ');
     renderRuleFilterDropdown(data?.filter_rule_ids || []);
     document.getElementById('rule-enabled').checked = data?.enabled !== false;
     document.getElementById('rule-modal').classList.add('active');
@@ -778,10 +739,6 @@ async function saveRule() {
         name: document.getElementById('rule-name').value,
         source_account: document.getElementById('rule-source').value,
         target_webhook: document.getElementById('rule-target').value,
-        filters: document.getElementById('rule-filters').value
-            .split(',')
-            .map(s => s.trim())
-            .filter(s => s),
         filter_rule_ids: getSelectedRuleFilterIDs(),
         enabled: document.getElementById('rule-enabled').checked
     };
@@ -795,17 +752,40 @@ async function saveRule() {
         closeModal('rule-modal');
         loadRules();
     } catch (e) {
-        alert('保存失败: ' + e.message);
+        await showAppAlert('保存失败: ' + e.message, { type: 'error', title: '保存失败' });
     }
 }
 
 async function deleteRule(id) {
-    if (!confirm('确定要删除此转发规则吗？')) return;
+    if (!(await showAppConfirm('确定要删除此转发规则吗？', { title: '删除转发规则', confirmText: '删除' }))) return;
     try {
         await api('DELETE', `/api/rules/${id}`);
         loadRules();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        await showAppAlert('删除失败: ' + e.message, { type: 'error', title: '删除失败' });
+    }
+}
+
+async function addSenderToDefaultFilter(sender, mode) {
+    sender = (sender || '').trim();
+    if (!sender) {
+        await showAppAlert('发件人为空，无法加入过滤规则', { type: 'warning', title: '无法操作' });
+        return;
+    }
+
+    const modeName = mode === 'blacklist' ? '黑名单' : '白名单';
+    if (!(await showAppConfirm(`确定将 ${sender} 加入默认发件人${modeName}吗？`, { title: `加入${modeName}`, confirmText: '加入' }))) return;
+
+    try {
+        const result = await api('POST', '/api/filters/default-senders', { mode, sender });
+        if (result.error) {
+            await showAppAlert('操作失败: ' + result.error, { type: 'error', title: '操作失败' });
+            return;
+        }
+        await showAppAlert(result.added ? `已加入默认发件人${modeName}` : `该发件人已在默认发件人${modeName}中`, { type: 'success', title: '操作完成' });
+        loadFilters();
+    } catch (e) {
+        await showAppAlert('操作失败: ' + e.message, { type: 'error', title: '操作失败' });
     }
 }
 
@@ -840,14 +820,20 @@ function renderHistory(messages) {
     const statusTags = {
         pending: '<span class="tag tag-warning">待发送</span>',
         sent: '<span class="tag tag-success">已发送</span>',
-        failed: '<span class="tag tag-error">发送失败</span>'
+        failed: '<span class="tag tag-error">发送失败</span>',
+        filtered: '<span class="tag tag-neutral">已过滤</span>',
+        no_rule: '<span class="tag tag-neutral">无规则</span>'
     };
 
     container.innerHTML = messages.map(msg => `
         <div class="history-item">
             <div class="history-header">
                 <span class="history-subject">${escapeHtml(msg.subject || '(无主题)')}</span>
-                ${statusTags[msg.status] || ''}
+                <span class="history-actions">
+                    ${statusTags[msg.status] || ''}
+                    <button class="btn btn-secondary btn-sm" onclick='addSenderToDefaultFilter(${JSON.stringify(msg.from || '')}, "blacklist")'>加入黑名单</button>
+                    <button class="btn btn-secondary btn-sm" onclick='addSenderToDefaultFilter(${JSON.stringify(msg.from || '')}, "whitelist")'>加入白名单</button>
+                </span>
             </div>
             <div class="history-meta">
                 <span>
@@ -872,6 +858,79 @@ function renderHistory(messages) {
 }
 
 // ===================== Utilities =====================
+function showAppDialog(options = {}) {
+    const dialog = document.getElementById('app-dialog');
+    const icon = document.getElementById('app-dialog-icon');
+    const title = document.getElementById('app-dialog-title');
+    const message = document.getElementById('app-dialog-message');
+    const cancelBtn = document.getElementById('app-dialog-cancel');
+    const confirmBtn = document.getElementById('app-dialog-confirm');
+    const type = options.type || 'info';
+    const iconMap = {
+        info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+        error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+    };
+
+    title.textContent = options.title || '提示';
+    message.textContent = options.message || '';
+    icon.className = `app-dialog-icon ${type}`;
+    icon.innerHTML = iconMap[type] || iconMap.info;
+    confirmBtn.textContent = options.confirmText || '确定';
+    cancelBtn.textContent = options.cancelText || '取消';
+    cancelBtn.style.display = options.showCancel ? 'inline-flex' : 'none';
+    dialog.classList.add('active');
+    dialog.setAttribute('aria-hidden', 'false');
+
+    return new Promise(resolve => {
+        const cleanup = result => {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            dialog.removeEventListener('click', onOverlay);
+            document.removeEventListener('keydown', onKeydown);
+            dialog.classList.remove('active');
+            dialog.setAttribute('aria-hidden', 'true');
+            resolve(result);
+        };
+        const onConfirm = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onOverlay = event => {
+            if (event.target === dialog) cleanup(false);
+        };
+        const onKeydown = event => {
+            if (event.key === 'Escape') cleanup(false);
+        };
+
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        dialog.addEventListener('click', onOverlay);
+        document.addEventListener('keydown', onKeydown);
+        setTimeout(() => confirmBtn.focus(), 0);
+    });
+}
+
+function showAppAlert(message, options = {}) {
+    return showAppDialog({
+        title: options.title || '提示',
+        message,
+        type: options.type || 'info',
+        confirmText: options.confirmText || '确定',
+        showCancel: false
+    });
+}
+
+function showAppConfirm(message, options = {}) {
+    return showAppDialog({
+        title: options.title || '确认操作',
+        message,
+        type: options.type || 'warning',
+        confirmText: options.confirmText || '确定',
+        cancelText: options.cancelText || '取消',
+        showCancel: true
+    });
+}
+
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
     document.getElementById('rule-filter-dropdown')?.classList.remove('open');
