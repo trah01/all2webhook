@@ -1,4 +1,4 @@
-module mail2webhook
+module all2webhook
 
 go 1.25.5
 
@@ -7,6 +7,7 @@ require (
 	github.com/emersion/go-imap v1.2.1
 	github.com/emersion/go-message v0.18.2
 	github.com/gin-gonic/gin v1.11.0
+	github.com/lib/pq v1.10.9
 	modernc.org/sqlite v1.46.1
 )
 

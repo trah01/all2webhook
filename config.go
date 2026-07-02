@@ -26,7 +26,35 @@ func loadConfig() {
 		return
 	}
 	ensureDefaultSenderFilterRulesNoLock()
+	normalizeForwardRulesNoLock()
 	saveConfigNoLock()
+}
+
+func normalizeForwardRulesNoLock() {
+	for i := range config.Rules {
+		config.Rules[i] = normalizeForwardRule(config.Rules[i])
+	}
+}
+
+func normalizeForwardRule(rule ForwardRule) ForwardRule {
+	targets := make([]string, 0, len(rule.TargetWebhooks)+1)
+	seen := make(map[string]bool)
+	if rule.TargetWebhook != "" {
+		targets = append(targets, rule.TargetWebhook)
+		seen[rule.TargetWebhook] = true
+	}
+	for _, id := range rule.TargetWebhooks {
+		if id == "" || seen[id] {
+			continue
+		}
+		targets = append(targets, id)
+		seen[id] = true
+	}
+	rule.TargetWebhooks = targets
+	if len(rule.TargetWebhooks) > 0 {
+		rule.TargetWebhook = rule.TargetWebhooks[0]
+	}
+	return rule
 }
 
 func saveConfigNoLock() {

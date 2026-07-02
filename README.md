@@ -1,123 +1,65 @@
-# Mail2Webhook
+# All2Webhook
 
-[中文](#中文) | [English](#english) 
+All2Webhook 是一个使用 Go 编写的通知集合转发服务。它保留 IMAP 邮件拉取能力，同时提供固定的公开接收 URL，用于接收 GitHub、飞书、Gotify、Bark、Server 酱、自定义 JSON 或其他 HTTP 通知，并根据规则转发到多个 Webhook 渠道。
 
----
+## 核心能力
 
-<h2 id="中文">Mail2Webhook (中文)</h2>
+- 统一接收入口：每个接收项目生成高强度密钥 URL，例如 `http://localhost:8081/hook/<secret>`。
+- 双端口隔离：`8080` 用于 Web 管理界面，`8081` 只用于公开接收通知。
+- 多目标转发：一条转发规则可以同时发送到多个飞书、钉钉、企业微信、Slack、Discord 或自定义 Webhook。
+- 自动解析：优先解析常见 JSON 与 GitHub Webhook；无法识别时保留完整请求内容，避免漏通知。
+- PostgreSQL 支持：Docker Compose 默认启动 PostgreSQL；未配置 `DATABASE_URL` 时可回退 SQLite。
+- 邮件兼容：仍支持 IMAP 拉取邮件并复用原有过滤、格式化和转发能力。
 
-一个使用 Go 编写的轻量级、高并发邮件转发工具。支持通过 IMAP 协议拉取邮件，并根据自定义路由规则（来源账号、关键词过滤）转发至飞书 (Feishu)、钉钉 (DingTalk)、企业微信 (WeCom)、Slack、Discord 或自定义 Webhook 平台。随附一个内置的 Web 控制台管理面板。
-
-### **注意：该项目没有编写鉴权功能，没有做包括sql注入等的安全防护，不要开放到公网！！！**
-
-### 核心特性
-
-- **高并发与稳定性**: 每个邮箱账号由独立的 goroutine 轮询。借助 SQLite WAL 模式保证并发环境下的数据读写安全。
-- **验证码智能提取**: 自动通过正则表达式嗅探邮件标题与正文中的验证码/动态指令，并将其置顶在推送消息头部。
-- **规则路由**: 支持基于发送凭测（按不同账号）和正文/标题关键词的规则过滤。
-- **Web 控制台**: 提供内置的可视化面板，供动态管理账号、Webhook 通道和路由规则，无需手动修改配置文件。
-- **隐私与安全**: 邮件内容推送完毕后即从本地数据库清除。API 接口对前端请求自动打码脱敏凭证和 Webhook 密钥。支持系统的平滑退出 (Graceful Shutdown)。
-- **长文本处理**: 自动清理 HTML 冗余标签，保留 Markdown 核心语法，并在目标平台字数受限时自动执行分块 (Chunk) 发送。
-
-### 快速开始 (Docker)
-
-你可以直接使用预构建的 Docker 镜像一键启动服务。
-
-1. 创建数据目录：
-   ```bash
-   mkdir -p data
-   ```
-
-2. 运行容器:
-   ```bash
-   docker run -d \
-     --name mail2webhook \
-     -p 8080:8080 \
-     -v $(pwd)/data:/app/data \
-     -e TZ=Asia/Shanghai \
-     --restart unless-stopped \
-     trah01/mail2webhook:latest
-   ```
-   或者使用docker-compose.yaml文件
-   ```
-   docker compose up -d
-   ```
-
-3. 访问控制台: 打开浏览器访问 `http://localhost:8080` 进行可视化配置。
-
-### 支持的 Webhook 通道
-- `feishu` (内置交互式富文本卡片)
-- `dingtalk` (钉钉 Markdown 消息)
-- `wecom` (企业微信 Markdown 消息)
-- `slack` (Block Kit 排版)
-- `discord` (Embed 排版)
-- `custom` (原始 JSON Payload)
-
-### 开发构建
-
-构建需要 Go 1.21+ 环境。
+## Docker Compose 启动
 
 ```bash
-go mod download
-go run main.go
+cd all2webhook
+docker compose up -d --build
 ```
 
----
+访问地址：
 
-<h2 id="english">Mail2Webhook (English)</h2>
+- 管理界面：`http://localhost:8080`
+- 公开接收端口：`http://localhost:8081`
 
-A lightweight, concurrent email forwarding bot written in Go. Forwards IMAP emails to Feishu, DingTalk, WeCom, Slack, Discord, or custom Webhooks with rule-based routing and a built-in web dashboard.
+查看状态和日志：
 
-### **Warning: This project lacks proper authentication and security measures (like protection against SQL injection). DO NOT expose it directly to the public internet!!!**
+```bash
+docker compose ps
+docker compose logs -f all2webhook
+docker compose logs -f postgres
+```
 
-### Features
+## 接收通知示例
 
-- **Concurrency & Stability**: Independent IMAP polling goroutines per account. Safe concurrent data access using SQLite WAL mode.
-- **Smart Extraction**: Automatically matches verification codes via regex from email subjects/bodies, hoisting them to the top of the forwarded message for quick access.
-- **Rule-based Routing**: Flexible routing of emails based on source accounts and subject keyword filters.
-- **Web Dashboard**: Built-in HTTP interface for managing accounts, webhooks, and routing rules dynamically without touching JSON files.
-- **Privacy & Security**: Auto-cleans email bodies from the local database post-delivery. API endpoints automatically mask sensitive credentials and webhook secrets. Graceful shutdown handler.
-- **Content Formatting**: Cleans HTML payload, preserves basic markdown, and automatically chunks large payloads to bypass target platform limits.
+在管理界面的“接收项目”中创建项目后，复制生成的接收 URL：
 
-### Quick Start (Docker)
+```bash
+curl -X POST 'http://localhost:8081/hook/<secret>' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"部署完成","message":"生产环境发布成功"}'
+```
 
-You can run the service directly using the pre-built Docker image.
+然后在“转发规则”中选择该接收项目作为来源，并勾选一个或多个目标渠道。
 
-1. Create a data directory:
-   ```bash
-   mkdir -p data
-   ```
+## 本地开发
 
-2. Run the container:
-   ```bash
-   docker run -d \
-     --name mail2webhook \
-     -p 8080:8080 \
-     -v $(pwd)/data:/app/data \
-     -e TZ=Asia/Shanghai \
-     --restart unless-stopped \
-     trah01/mail2webhook:latest
-   ```
-   Or use the `docker-compose.yaml` file:
-   ```bash
-   docker compose up -d
-   ```
-
-3. Access the dashboard at `http://localhost:8080` to configure via the web UI.
-
-### Supported Webhooks
-- `feishu` (Interactive Cards)
-- `dingtalk` (DingTalk Markdown)
-- `wecom` (WeCom Markdown)
-- `slack` (Block Kit)
-- `discord` (Embeds)
-- `custom` (Raw JSON payload)
-
-### Development
-
-Requires Go 1.21+.
+需要 Go 1.21 或更新版本。
 
 ```bash
 go mod download
-go run main.go
+go test ./...
+go run .
+```
+
+默认本地运行端口：
+
+- 管理端口：`8080`
+- 公开接收端口：`8081`
+
+如需使用 PostgreSQL，设置 `DATABASE_URL`：
+
+```bash
+DATABASE_URL='postgres://all2webhook:all2webhook_password@localhost:5432/all2webhook?sslmode=disable' go run .
 ```

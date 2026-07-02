@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -248,6 +249,75 @@ func setupAPI(r *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
+	// ===== 接收项目管理 =====
+	r.GET("/api/projects", func(c *gin.Context) {
+		projects, err := listInboundProjects(os.Getenv("PUBLIC_BASE_URL"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, projects)
+	})
+
+	r.POST("/api/projects", func(c *gin.Context) {
+		var req struct {
+			Name    string `json:"name"`
+			Enabled *bool  `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		enabled := true
+		if req.Enabled != nil {
+			enabled = *req.Enabled
+		}
+		project, err := createInboundProject(req.Name, enabled)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		project.URL = buildInboundURL(os.Getenv("PUBLIC_BASE_URL"), project.Secret)
+		c.JSON(http.StatusOK, project)
+	})
+
+	r.PUT("/api/projects/:id", func(c *gin.Context) {
+		var req struct {
+			Name    string `json:"name"`
+			Enabled bool   `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := updateInboundProject(c.Param("id"), req.Name, req.Enabled); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	r.POST("/api/projects/:id/rotate", func(c *gin.Context) {
+		secret, err := rotateInboundProjectSecret(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"secret":  secret,
+			"url":     buildInboundURL(os.Getenv("PUBLIC_BASE_URL"), secret),
+		})
+	})
+
+	r.DELETE("/api/projects/:id", func(c *gin.Context) {
+		if err := deleteInboundProject(c.Param("id")); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
 	// ===== 过滤规则管理 =====
 	r.GET("/api/filters", func(c *gin.Context) {
 		configLock.RLock()
@@ -351,6 +421,7 @@ func setupAPI(r *gin.Engine) {
 		if rule.ID == "" {
 			rule.ID = fmt.Sprintf("rule_%d", time.Now().UnixNano())
 		}
+		rule = normalizeForwardRule(rule)
 		configLock.Lock()
 		config.Rules = append(config.Rules, rule)
 		saveConfigNoLock()
@@ -369,6 +440,7 @@ func setupAPI(r *gin.Engine) {
 		for i, r := range config.Rules {
 			if r.ID == id {
 				rule.ID = id
+				rule = normalizeForwardRule(rule)
 				config.Rules[i] = rule
 				break
 			}

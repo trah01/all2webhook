@@ -53,7 +53,7 @@ func sendToFeishu(webhookURL, subject, from, date, body string) error {
 
 		elements = append(elements, map[string]interface{}{
 			"tag":      "note",
-			"elements": []map[string]interface{}{{"tag": "plain_text", "content": fmt.Sprintf("[Mail2Webhook] Part %d / %d", idx, totalBatches)}},
+			"elements": []map[string]interface{}{{"tag": "plain_text", "content": fmt.Sprintf("[All2Webhook] Part %d / %d", idx, totalBatches)}},
 		})
 
 		card := map[string]interface{}{
@@ -145,7 +145,7 @@ func sendToDiscord(webhookURL, subject, from, date, body string) error {
 					{"name": "时间", "value": date, "inline": true},
 				},
 				"footer": map[string]interface{}{
-					"text": "Mail2Webhook",
+					"text": "All2Webhook",
 				},
 			},
 		},

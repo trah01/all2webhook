@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -67,9 +68,9 @@ func processPendingMessages() {
 				continue
 			}
 
-			// 获取目标 Webhook
-			webhook, ok := webhooks[rule.TargetWebhook]
-			if !ok || !webhook.Enabled {
+			rule = normalizeForwardRule(rule)
+			targetIDs := rule.TargetWebhooks
+			if len(targetIDs) == 0 {
 				continue
 			}
 
@@ -93,34 +94,57 @@ func processPendingMessages() {
 				displayBody = fmt.Sprintf("**[智能提取验证码] %s**\n\n%s", verificationCode, msg.Body)
 			}
 
-			switch webhook.Type {
-			case "feishu":
-				sendErr = sendToFeishu(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
-			case "dingtalk":
-				sendErr = sendToDingTalk(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
-			case "wecom":
-				sendErr = sendToWeCom(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
-			case "slack":
-				sendErr = sendToSlack(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
-			case "discord":
-				sendErr = sendToDiscord(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
-			case "custom":
-				sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+			sentTargets := make([]string, 0, len(targetIDs))
+			failedTargets := make([]string, 0)
+			for _, targetID := range targetIDs {
+				webhook, ok := webhooks[targetID]
+				if !ok || !webhook.Enabled {
+					continue
+				}
+
+				switch webhook.Type {
+				case "feishu":
+					sendErr = sendToFeishu(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+				case "dingtalk":
+					sendErr = sendToDingTalk(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+				case "wecom":
+					sendErr = sendToWeCom(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+				case "slack":
+					sendErr = sendToSlack(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+				case "discord":
+					sendErr = sendToDiscord(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+				case "custom":
+					sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, msg.From, dateStr, displayBody)
+				default:
+					sendErr = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
+				}
+
+				if sendErr != nil {
+					failedTargets = append(failedTargets, fmt.Sprintf("%s: %v", webhook.Name, sendErr))
+					addLog(fmt.Sprintf("发送失败 [%s -> %s]: %v", subjectForSend, webhook.Name, sendErr), "error")
+					continue
+				}
+				sentTargets = append(sentTargets, webhook.Name)
+				addLog(fmt.Sprintf("转发成功 [%s -> %s]", subjectForSend, webhook.Name), "success")
 			}
 
-			if sendErr != nil {
+			if len(sentTargets) == 0 {
 				msg.RetryCount++
-				msg.ErrorMessage = sendErr.Error()
+				msg.ErrorMessage = strings.Join(failedTargets, "; ")
+				if msg.ErrorMessage == "" {
+					msg.ErrorMessage = "没有可用的目标 Webhook"
+				}
 				saveMessage(&msg)
-				addLog(fmt.Sprintf("发送失败 [%s -> %s]: %v", subjectForSend, webhook.Name, sendErr), "error")
 			} else {
 				msg.Status = "sent"
-				msg.TargetType = webhook.Type
-				msg.TargetName = webhook.Name
+				msg.TargetType = "multi"
+				msg.TargetName = strings.Join(sentTargets, ", ")
+				if len(failedTargets) > 0 {
+					msg.ErrorMessage = "部分目标失败: " + strings.Join(failedTargets, "; ")
+				}
 				now := time.Now()
 				msg.SentAt = &now
 				saveMessage(&msg)
-				addLog(fmt.Sprintf("转发成功 [%s -> %s]", subjectForSend, webhook.Name), "success")
 			}
 			break // 匹配到第一条规则并尝试发送后，不再继续匹配后续规则
 		}
@@ -165,7 +189,7 @@ func startBackgroundTasks() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		for range ticker.C {
-			db.Exec(`UPDATE messages SET body = '', body_html = '' WHERE status IN ('sent', 'failed') AND body != ''`)
+			dbExec(`UPDATE messages SET body = '', body_html = '' WHERE status IN ('sent', 'failed') AND body != ''`)
 		}
 	}()
 

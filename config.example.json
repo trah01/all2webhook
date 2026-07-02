@@ -28,6 +28,9 @@
       "name": "转发全部",
       "source_account": "all",
       "target_webhook": "wh_17700000000",
+      "target_webhooks": [
+        "wh_17700000000"
+      ],
       "filter_rule_ids": [],
       "enabled": true
     }

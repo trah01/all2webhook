@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -147,5 +148,58 @@ func TestAddSenderToDefaultFilterRuleNoLock_CreatesDefaultsAndDeduplicates(t *te
 
 	if len(config.FilterRules) != 2 {
 		t.Fatalf("expected both default sender rules to exist, got %d", len(config.FilterRules))
+	}
+}
+
+func TestNormalizeForwardRule_MigratesSingleTargetAndDeduplicates(t *testing.T) {
+	rule := normalizeForwardRule(ForwardRule{
+		TargetWebhook:  "wh_1",
+		TargetWebhooks: []string{"wh_1", "wh_2", "wh_2"},
+	})
+
+	if rule.TargetWebhook != "wh_1" {
+		t.Fatalf("expected first target to stay compatible, got %q", rule.TargetWebhook)
+	}
+	if strings.Join(rule.TargetWebhooks, ",") != "wh_1,wh_2" {
+		t.Fatalf("expected deduplicated target list, got %#v", rule.TargetWebhooks)
+	}
+}
+
+func TestParseInboundPayload_GitHubPush(t *testing.T) {
+	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GitHub-Event", "push")
+	body := []byte(`{"ref":"refs/heads/main","repository":{"full_name":"owner/repo"},"head_commit":{"message":"update"}}`)
+
+	got := parseInboundPayload(req, body)
+
+	if !strings.Contains(got.Subject, "GitHub push owner/repo refs/heads/main") {
+		t.Fatalf("expected GitHub push subject, got %q", got.Subject)
+	}
+	if got.From != "github" {
+		t.Fatalf("expected github sender, got %q", got.From)
+	}
+	if !strings.Contains(got.Body, "owner/repo") {
+		t.Fatalf("expected original JSON body content, got %q", got.Body)
+	}
+}
+
+func TestParseInboundPayload_UnknownBodyIsPreserved(t *testing.T) {
+	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "text/plain")
+
+	got := parseInboundPayload(req, []byte("raw notice"))
+
+	if got.Subject != "外部通知" {
+		t.Fatalf("expected fallback subject, got %q", got.Subject)
+	}
+	if !strings.Contains(got.Body, "raw notice") {
+		t.Fatalf("expected raw body preserved, got %q", got.Body)
 	}
 }

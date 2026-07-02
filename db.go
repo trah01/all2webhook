@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 )
 
@@ -18,17 +22,40 @@ func initDB() {
 	}
 
 	var err error
-	db, err = sql.Open("sqlite", DBFile)
+	driverName := "sqlite"
+	dataSource := DBFile
+	if databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL")); databaseURL != "" {
+		driverName = "postgres"
+		dataSource = databaseURL
+	}
+
+	dbDialect = driverName
+	db, err = sql.Open(driverName, dataSource)
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
 	}
+	if err := db.Ping(); err != nil {
+		log.Fatal("Failed to connect database:", err)
+	}
 
-	// 开启 WAL 模式和设置 busy_timeout ，避免并发写入锁定和提升性能
-	db.Exec("PRAGMA journal_mode=WAL;")
-	db.Exec("PRAGMA busy_timeout=5000;")
+	if dbDialect == "sqlite" {
+		// 开启 WAL 模式和设置 busy_timeout ，避免并发写入锁定和提升性能
+		db.Exec("PRAGMA journal_mode=WAL;")
+		db.Exec("PRAGMA busy_timeout=5000;")
+	}
 
-	// 创建消息表
-	_, err = db.Exec(`
+	if dbDialect == "postgres" {
+		err = initPostgresSchema()
+	} else {
+		err = initSQLiteSchema()
+	}
+	if err != nil {
+		log.Fatal("Failed to create tables:", err)
+	}
+}
+
+func initSQLiteSchema() error {
+	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS messages (
 			id TEXT PRIMARY KEY,
 			source_email TEXT,
@@ -50,14 +77,113 @@ func initDB() {
 		CREATE INDEX IF NOT EXISTS idx_status ON messages(status);
 		CREATE INDEX IF NOT EXISTS idx_created ON messages(created_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_account ON messages(account_id);
+		CREATE TABLE IF NOT EXISTS inbound_projects (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			secret TEXT NOT NULL UNIQUE,
+			enabled BOOLEAN DEFAULT TRUE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			rotated_at DATETIME
+		);
+		CREATE INDEX IF NOT EXISTS idx_inbound_projects_secret ON inbound_projects(secret);
 	`)
-	if err != nil {
-		log.Fatal("Failed to create tables:", err)
+	return err
+}
+
+func initPostgresSchema() error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS messages (
+			id TEXT PRIMARY KEY,
+			source_email TEXT,
+			account_id TEXT,
+			subject TEXT,
+			from_addr TEXT,
+			to_addr TEXT,
+			date TIMESTAMPTZ,
+			body TEXT,
+			body_html TEXT,
+			status TEXT DEFAULT 'pending',
+			target_type TEXT,
+			target_name TEXT,
+			retry_count INTEGER DEFAULT 0,
+			error_message TEXT,
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			sent_at TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS idx_status ON messages(status);
+		CREATE INDEX IF NOT EXISTS idx_created ON messages(created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_account ON messages(account_id);
+		CREATE TABLE IF NOT EXISTS inbound_projects (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			secret TEXT NOT NULL UNIQUE,
+			enabled BOOLEAN DEFAULT TRUE,
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			rotated_at TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS idx_inbound_projects_secret ON inbound_projects(secret);
+	`)
+	return err
+}
+
+func dbExec(query string, args ...interface{}) (sql.Result, error) {
+	return db.Exec(rebindQuery(query), args...)
+}
+
+func dbQuery(query string, args ...interface{}) (*sql.Rows, error) {
+	return db.Query(rebindQuery(query), args...)
+}
+
+func dbQueryRow(query string, args ...interface{}) *sql.Row {
+	return db.QueryRow(rebindQuery(query), args...)
+}
+
+func rebindQuery(query string) string {
+	if dbDialect != "postgres" {
+		return query
 	}
+	var b strings.Builder
+	argIndex := 1
+	for _, r := range query {
+		if r == '?' {
+			b.WriteString(fmt.Sprintf("$%d", argIndex))
+			argIndex++
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func saveMessage(msg *Message) error {
-	_, err := db.Exec(`
+	if dbDialect == "postgres" {
+		_, err := dbExec(`
+			INSERT INTO messages
+			(id, source_email, account_id, subject, from_addr, to_addr, date, body, body_html,
+			 status, target_type, target_name, retry_count, error_message, created_at, sent_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (id) DO UPDATE SET
+				source_email = EXCLUDED.source_email,
+				account_id = EXCLUDED.account_id,
+				subject = EXCLUDED.subject,
+				from_addr = EXCLUDED.from_addr,
+				to_addr = EXCLUDED.to_addr,
+				date = EXCLUDED.date,
+				body = EXCLUDED.body,
+				body_html = EXCLUDED.body_html,
+				status = EXCLUDED.status,
+				target_type = EXCLUDED.target_type,
+				target_name = EXCLUDED.target_name,
+				retry_count = EXCLUDED.retry_count,
+				error_message = EXCLUDED.error_message,
+				created_at = EXCLUDED.created_at,
+				sent_at = EXCLUDED.sent_at
+		`, msg.ID, msg.SourceEmail, msg.AccountID, msg.Subject, msg.From, msg.To, msg.Date,
+			msg.Body, msg.BodyHTML, msg.Status, msg.TargetType, msg.TargetName,
+			msg.RetryCount, msg.ErrorMessage, msg.CreatedAt, msg.SentAt)
+		return err
+	}
+	_, err := dbExec(`
 		INSERT OR REPLACE INTO messages
 		(id, source_email, account_id, subject, from_addr, to_addr, date, body, body_html,
 		 status, target_type, target_name, retry_count, error_message, created_at, sent_at)
@@ -82,7 +208,7 @@ func getMessages(status string, limit int, offset int) ([]Message, error) {
 	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
-	rows, err := db.Query(query, args...)
+	rows, err := dbQuery(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +219,11 @@ func getMessages(status string, limit int, offset int) ([]Message, error) {
 		var msg Message
 		var nsSubject, nsFrom, nsTo, nsBody, nsTargetType, nsTargetName, nsErrorMsg, nsSourceEmail sql.NullString
 		var niRetryCount sql.NullInt64
-		var dateStr, createdAtStr string
-		var nsDate, nsCreatedAt, sentAtStr sql.NullString
+		var nsDate, nsCreatedAt, sentAtValue interface{}
 
 		err := rows.Scan(&msg.ID, &nsSourceEmail, &msg.AccountID, &nsSubject, &nsFrom,
 			&nsTo, &nsDate, &nsBody, &msg.Status, &nsTargetType, &nsTargetName,
-			&niRetryCount, &nsErrorMsg, &nsCreatedAt, &sentAtStr)
+			&niRetryCount, &nsErrorMsg, &nsCreatedAt, &sentAtValue)
 		if err != nil {
 			return nil, err
 		}
@@ -113,17 +238,9 @@ func getMessages(status string, limit int, offset int) ([]Message, error) {
 		msg.ErrorMessage = nsErrorMsg.String
 		msg.RetryCount = int(niRetryCount.Int64)
 
-		if nsDate.Valid {
-			dateStr = nsDate.String
-		}
-		if nsCreatedAt.Valid {
-			createdAtStr = nsCreatedAt.String
-		}
-
-		msg.Date = tryParseTime(dateStr)
-		msg.CreatedAt = tryParseTime(createdAtStr)
-		if sentAtStr.Valid && sentAtStr.String != "" {
-			t := tryParseTime(sentAtStr.String)
+		msg.Date = scanTimeValue(nsDate)
+		msg.CreatedAt = scanTimeValue(nsCreatedAt)
+		if t := scanTimeValue(sentAtValue); !t.IsZero() {
 			msg.SentAt = &t
 		}
 
@@ -154,9 +271,24 @@ func tryParseTime(s string) time.Time {
 	return time.Time{}
 }
 
+func scanTimeValue(value interface{}) time.Time {
+	switch v := value.(type) {
+	case nil:
+		return time.Time{}
+	case time.Time:
+		return v
+	case []byte:
+		return tryParseTime(string(v))
+	case string:
+		return tryParseTime(v)
+	default:
+		return tryParseTime(fmt.Sprint(v))
+	}
+}
+
 func getMessageStats() (map[string]int, error) {
 	stats := make(map[string]int)
-	rows, err := db.Query(`SELECT status, COUNT(*) FROM messages GROUP BY status`)
+	rows, err := dbQuery(`SELECT status, COUNT(*) FROM messages GROUP BY status`)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +306,107 @@ func getMessageStats() (map[string]int, error) {
 }
 
 func deleteOldMessages(days int) error {
-	_, err := db.Exec(`DELETE FROM messages WHERE created_at < datetime('now', ?)`,
-		fmt.Sprintf("-%d days", days))
+	if dbDialect == "postgres" {
+		_, err := dbExec(`DELETE FROM messages WHERE created_at < NOW() - (? || ' days')::interval`, days)
+		return err
+	}
+	_, err := dbExec(`DELETE FROM messages WHERE created_at < datetime('now', ?)`, fmt.Sprintf("-%d days", days))
 	return err
+}
+
+func listInboundProjects(publicBaseURL string) ([]InboundProject, error) {
+	rows, err := dbQuery(`SELECT id, name, secret, enabled, created_at, rotated_at FROM inbound_projects ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	projects := []InboundProject{}
+	for rows.Next() {
+		var project InboundProject
+		var createdAt, rotatedAt interface{}
+		if err := rows.Scan(&project.ID, &project.Name, &project.Secret, &project.Enabled, &createdAt, &rotatedAt); err != nil {
+			return nil, err
+		}
+		project.CreatedAt = scanTimeValue(createdAt)
+		if t := scanTimeValue(rotatedAt); !t.IsZero() {
+			project.RotatedAt = &t
+		}
+		project.URL = buildInboundURL(publicBaseURL, project.Secret)
+		projects = append(projects, project)
+	}
+	return projects, rows.Err()
+}
+
+func getInboundProjectBySecret(secret string) (*InboundProject, error) {
+	var project InboundProject
+	var createdAt, rotatedAt interface{}
+	err := dbQueryRow(
+		`SELECT id, name, secret, enabled, created_at, rotated_at FROM inbound_projects WHERE secret = ?`,
+		secret,
+	).Scan(&project.ID, &project.Name, &project.Secret, &project.Enabled, &createdAt, &rotatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	project.CreatedAt = scanTimeValue(createdAt)
+	if t := scanTimeValue(rotatedAt); !t.IsZero() {
+		project.RotatedAt = &t
+	}
+	return &project, nil
+}
+
+func createInboundProject(name string, enabled bool) (*InboundProject, error) {
+	project := &InboundProject{
+		ID:        fmt.Sprintf("project_%d", time.Now().UnixNano()),
+		Name:      strings.TrimSpace(name),
+		Secret:    generateSecret(),
+		Enabled:   enabled,
+		CreatedAt: time.Now(),
+	}
+	if project.Name == "" {
+		project.Name = "未命名项目"
+	}
+	_, err := dbExec(
+		`INSERT INTO inbound_projects (id, name, secret, enabled, created_at) VALUES (?, ?, ?, ?, ?)`,
+		project.ID, project.Name, project.Secret, project.Enabled, project.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+func updateInboundProject(id string, name string, enabled bool) error {
+	_, err := dbExec(`UPDATE inbound_projects SET name = ?, enabled = ? WHERE id = ?`, strings.TrimSpace(name), enabled, id)
+	return err
+}
+
+func rotateInboundProjectSecret(id string) (string, error) {
+	secret := generateSecret()
+	_, err := dbExec(`UPDATE inbound_projects SET secret = ?, rotated_at = ? WHERE id = ?`, secret, time.Now(), id)
+	return secret, err
+}
+
+func deleteInboundProject(id string) error {
+	_, err := dbExec(`DELETE FROM inbound_projects WHERE id = ?`, id)
+	return err
+}
+
+func generateSecret() string {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return base64.RawURLEncoding.EncodeToString(buf)
+}
+
+func buildInboundURL(publicBaseURL string, secret string) string {
+	base := strings.TrimRight(strings.TrimSpace(publicBaseURL), "/")
+	if base == "" {
+		return "/hook/" + secret
+	}
+	return base + "/hook/" + secret
 }

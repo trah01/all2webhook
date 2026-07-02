@@ -28,12 +28,13 @@ type WebhookTarget struct {
 
 // ForwardRule 转发规则
 type ForwardRule struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	SourceAccount string   `json:"source_account"`  // 邮箱账号ID，"all" 表示所有
-	TargetWebhook string   `json:"target_webhook"`  // Webhook目标ID
-	FilterRuleIDs []string `json:"filter_rule_ids"` // 独立过滤规则ID
-	Enabled       bool     `json:"enabled"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	SourceAccount  string   `json:"source_account"`  // 邮箱账号ID、接收项目ID，"all" 表示所有
+	TargetWebhook  string   `json:"target_webhook"`  // 兼容旧配置的单 Webhook 目标ID
+	TargetWebhooks []string `json:"target_webhooks"` // Webhook 目标ID列表
+	FilterRuleIDs  []string `json:"filter_rule_ids"` // 独立过滤规则ID
+	Enabled        bool     `json:"enabled"`
 }
 
 // Message 存储的消息
@@ -61,6 +62,17 @@ type LogEntry struct {
 	Time    string `json:"time"`
 	Message string `json:"message"`
 	Type    string `json:"type"` // "info", "success", "error", "warning"
+}
+
+// InboundProject 公开接收入口配置。
+type InboundProject struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Secret    string     `json:"secret,omitempty"`
+	URL       string     `json:"url,omitempty"`
+	Enabled   bool       `json:"enabled"`
+	CreatedAt time.Time  `json:"created_at"`
+	RotatedAt *time.Time `json:"rotated_at,omitempty"`
 }
 
 // Config 全局配置

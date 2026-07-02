@@ -14,6 +14,7 @@ var (
 	config           Config
 	configLock       sync.RWMutex
 	db               *sql.DB
+	dbDialect        string
 	logs             []LogEntry
 	logsMutex        sync.Mutex
 	urlRegex         = regexp.MustCompile(`https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+`)

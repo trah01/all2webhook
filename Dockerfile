@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o mail2webhook .
+RUN CGO_ENABLED=0 GOOS=linux go build -o all2webhook .
 
 # Final stage
 FROM alpine:latest
@@ -22,10 +22,11 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates
 
 # Copy from builder
-COPY --from=builder /app/mail2webhook /app/mail2webhook
+COPY --from=builder /app/all2webhook /app/all2webhook
 
-# Expose the dashboard port
+# Expose the dashboard and public inbound ports
 EXPOSE 8080
+EXPOSE 8081
 
 # Run
-CMD ["./mail2webhook"]
+CMD ["./all2webhook"]

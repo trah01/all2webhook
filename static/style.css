@@ -368,6 +368,26 @@ tr:hover td {
     background: var(--hover-bg);
 }
 
+.muted-line {
+    margin-top: 4px;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+}
+
+.inline-code {
+    display: inline-block;
+    max-width: 360px;
+    padding: 5px 8px;
+    overflow: hidden;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
 /* ===================== Forms ===================== */
 .form-group {
     margin-bottom: 20px;

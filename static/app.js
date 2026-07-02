@@ -19,6 +19,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         // Load data for the page
         switch (tab.dataset.page) {
             case 'accounts': loadAccounts(); break;
+            case 'projects': loadProjects(); break;
             case 'webhooks': loadWebhooks(); break;
             case 'filters': loadFilters(); break;
             case 'rules': loadRules(); break;
@@ -595,177 +596,6 @@ async function deleteFilter(id) {
     }
 }
 
-// ===================== Rules =====================
-async function loadRules() {
-    try {
-        if (!filterRules.length) {
-            filterRules = await api('GET', '/api/filters');
-            if (!filterRules || !Array.isArray(filterRules)) filterRules = [];
-        }
-        rules = await api('GET', '/api/rules');
-        if (!rules || !Array.isArray(rules)) rules = [];
-        renderRules();
-    } catch (e) {
-        console.error('Failed to load rules:', e);
-        rules = [];
-        renderRules();
-    }
-}
-
-function renderRules() {
-    const tbody = document.getElementById('rules-table');
-    if (!rules || rules.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    暂无转发规则，点击上方按钮添加
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = rules.map(rule => {
-        const acc = accounts.find(a => a.id === rule.source_account);
-        const wh = webhooks.find(w => w.id === rule.target_webhook);
-        const selectedFilters = (rule.filter_rule_ids || [])
-            .map(id => filterRules.find(f => f.id === id))
-            .filter(Boolean);
-        return `
-            <tr>
-                <td><strong>${escapeHtml(rule.name)}</strong></td>
-                <td>${rule.source_account === 'all' ? '所有账号' : (acc?.name || '未知')}</td>
-                <td>${wh?.name || '未知'}</td>
-                <td>
-                    ${selectedFilters.length ? selectedFilters.map(f => `<span class="tag tag-info">${escapeHtml(f.name)}</span>`).join(' ') : '无'}
-                </td>
-                <td>
-                    <span class="tag ${rule.enabled ? 'tag-success' : 'tag-neutral'}">
-                        ${rule.enabled ? '已启用' : '已禁用'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-secondary btn-sm" onclick="editRule('${rule.id}')">编辑</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteRule('${rule.id}')">删除</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function openRuleModal(data = null) {
-    // Populate selects
-    const sourceSelect = document.getElementById('rule-source');
-    sourceSelect.innerHTML = '<option value="all">所有账号</option>' +
-        accounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
-
-    const targetSelect = document.getElementById('rule-target');
-    targetSelect.innerHTML = webhooks.map(w => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('');
-
-    document.getElementById('rule-modal-title').textContent = data ? '编辑转发规则' : '添加转发规则';
-    document.getElementById('rule-id').value = data?.id || '';
-    document.getElementById('rule-name').value = data?.name || '';
-    document.getElementById('rule-source').value = data?.source_account || 'all';
-    document.getElementById('rule-target').value = data?.target_webhook || '';
-    renderRuleFilterDropdown(data?.filter_rule_ids || []);
-    document.getElementById('rule-enabled').checked = data?.enabled !== false;
-    document.getElementById('rule-modal').classList.add('active');
-}
-
-function renderRuleFilterDropdown(selectedIDs = []) {
-    const menu = document.getElementById('rule-filter-menu');
-    if (!menu) return;
-
-    const selectedSet = new Set(selectedIDs);
-    if (!filterRules.length) {
-        menu.innerHTML = '<div class="filter-empty">暂无过滤规则，请先在过滤规则页面添加</div>';
-        updateRuleFilterSummary();
-        return;
-    }
-
-    menu.innerHTML = filterRules.map(rule => {
-        const typeName = rule.type === 'content' ? '邮件内容' : '发信人';
-        const modeName = rule.mode === 'blacklist' ? '黑名单' : '白名单';
-        const enabledText = rule.enabled ? '全局启用' : '全局禁用';
-        return `
-            <label class="filter-option">
-                <input type="checkbox" class="rule-filter-checkbox" value="${escapeHtml(rule.id)}"
-                    ${selectedSet.has(rule.id) ? 'checked' : ''} onchange="updateRuleFilterSummary()">
-                <span class="filter-option-main">
-                    <span class="filter-option-title">${escapeHtml(rule.name)}</span>
-                    <span class="filter-option-meta">${typeName} / ${modeName} / ${enabledText}</span>
-                </span>
-            </label>
-        `;
-    }).join('');
-    updateRuleFilterSummary();
-}
-
-function toggleRuleFilterDropdown(event) {
-    event.stopPropagation();
-    document.getElementById('rule-filter-dropdown').classList.toggle('open');
-}
-
-function getSelectedRuleFilterIDs() {
-    return Array.from(document.querySelectorAll('.rule-filter-checkbox:checked'))
-        .map(input => input.value);
-}
-
-function updateRuleFilterSummary() {
-    const summary = document.getElementById('rule-filter-summary');
-    if (!summary) return;
-
-    const selectedIDs = getSelectedRuleFilterIDs();
-    if (selectedIDs.length === 0) {
-        summary.textContent = '未应用过滤规则';
-        return;
-    }
-
-    const names = selectedIDs
-        .map(id => filterRules.find(rule => rule.id === id)?.name)
-        .filter(Boolean);
-    summary.textContent = names.length <= 2 ? names.join('、') : `已选择 ${names.length} 个过滤规则`;
-}
-
-function editRule(id) {
-    const rule = rules.find(r => r.id === id);
-    if (rule) openRuleModal(rule);
-}
-
-async function saveRule() {
-    const id = document.getElementById('rule-id').value;
-    const data = {
-        id: id || undefined,
-        name: document.getElementById('rule-name').value,
-        source_account: document.getElementById('rule-source').value,
-        target_webhook: document.getElementById('rule-target').value,
-        filter_rule_ids: getSelectedRuleFilterIDs(),
-        enabled: document.getElementById('rule-enabled').checked
-    };
-
-    try {
-        if (id) {
-            await api('PUT', `/api/rules/${id}`, data);
-        } else {
-            await api('POST', '/api/rules', data);
-        }
-        closeModal('rule-modal');
-        loadRules();
-    } catch (e) {
-        await showAppAlert('保存失败: ' + e.message, { type: 'error', title: '保存失败' });
-    }
-}
-
-async function deleteRule(id) {
-    if (!(await showAppConfirm('确定要删除此转发规则吗？', { title: '删除转发规则', confirmText: '删除' }))) return;
-    try {
-        await api('DELETE', `/api/rules/${id}`);
-        loadRules();
-    } catch (e) {
-        await showAppAlert('删除失败: ' + e.message, { type: 'error', title: '删除失败' });
-    }
-}
-
 async function addSenderToDefaultFilter(sender, mode) {
     sender = (sender || '').trim();
     if (!sender) {
@@ -970,20 +800,13 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 document.addEventListener('click', () => {
     document.getElementById('rule-filter-dropdown')?.classList.remove('open');
+    document.getElementById('rule-target-dropdown')?.classList.remove('open');
 });
 
 document.getElementById('rule-filter-dropdown')?.addEventListener('click', event => {
     event.stopPropagation();
 });
 
-// ===================== Initialize =====================
-loadStats();
-loadLogs();
-loadAccounts();
-loadWebhooks();
-loadFilters();
-loadRules();
-
-// Auto refresh
-setInterval(loadLogs, 5000);
-setInterval(loadStats, 10000);
+document.getElementById('rule-target-dropdown')?.addEventListener('click', event => {
+    event.stopPropagation();
+});

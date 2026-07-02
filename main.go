@@ -31,28 +31,47 @@ func main() {
 	startBackgroundTasks()
 
 	// 启动 Web 服务
-	r := gin.Default()
+	adminRouter := gin.Default()
 
 	// 设置模板
 	tmpl := template.Must(template.New("").ParseFS(templatesFS, "templates/*.html"))
-	r.SetHTMLTemplate(tmpl)
+	adminRouter.SetHTMLTemplate(tmpl)
 
 	// 设置 API
-	setupAPI(r)
+	setupAPI(adminRouter)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	srv := &http.Server{
+	adminSrv := &http.Server{
 		Addr:    ":" + port,
-		Handler: r,
+		Handler: adminRouter,
+	}
+
+	publicRouter := gin.Default()
+	setupPublicAPI(publicRouter)
+
+	publicPort := os.Getenv("PUBLIC_PORT")
+	if publicPort == "" {
+		publicPort = "8081"
+	}
+	publicSrv := &http.Server{
+		Addr:    ":" + publicPort,
+		Handler: publicRouter,
 	}
 
 	go func() {
-		addLog(fmt.Sprintf("Web 服务启动在端口: %s", port), "info")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		addLog(fmt.Sprintf("管理服务启动在端口: %s", port), "info")
+		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	go func() {
+		addLog(fmt.Sprintf("公开接收服务启动在端口: %s", publicPort), "info")
+		if err := publicSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
@@ -69,8 +88,11 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server Shutdown:", err)
+	if err := adminSrv.Shutdown(ctx); err != nil {
+		log.Fatal("Admin server shutdown:", err)
+	}
+	if err := publicSrv.Shutdown(ctx); err != nil {
+		log.Fatal("Public server shutdown:", err)
 	}
 
 	addLog("安全断开数据库连接...", "info")
