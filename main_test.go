@@ -72,3 +72,49 @@ func TestFormatPlainTextBody_FirstLineUsesTwoSpaceIndent(t *testing.T) {
 		t.Fatalf("expected first line to be exactly two spaces, got: %q", lines[0])
 	}
 }
+
+func TestApplyFilterRules_BlacklistBlocksSender(t *testing.T) {
+	msg := &Message{From: "newsletter@example.com", Subject: "周报", Body: "正文"}
+	rules := map[string]FilterRule{
+		"filter_1": {
+			ID:       "filter_1",
+			Name:     "屏蔽发信人",
+			Type:     "sender",
+			Mode:     "blacklist",
+			Patterns: []string{"example.com"},
+			Enabled:  true,
+		},
+	}
+
+	got := applyFilterRules([]string{"filter_1"}, rules, msg)
+
+	if got.Allowed {
+		t.Fatalf("expected blacklist sender rule to block message")
+	}
+}
+
+func TestApplyFilterRules_WhitelistRequiresContentMatch(t *testing.T) {
+	msg := &Message{From: "notice@example.com", Subject: "普通通知", Body: "没有关键词"}
+	rules := map[string]FilterRule{
+		"filter_1": {
+			ID:       "filter_1",
+			Name:     "只允许账单",
+			Type:     "content",
+			Mode:     "whitelist",
+			Patterns: []string{"账单"},
+			Enabled:  true,
+		},
+	}
+
+	got := applyFilterRules([]string{"filter_1"}, rules, msg)
+
+	if got.Allowed {
+		t.Fatalf("expected whitelist content rule to block unmatched message")
+	}
+
+	msg.Subject = "本月账单"
+	got = applyFilterRules([]string{"filter_1"}, rules, msg)
+	if !got.Allowed {
+		t.Fatalf("expected whitelist content rule to allow matched message: %s", got.Reason)
+	}
+}

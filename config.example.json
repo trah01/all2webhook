@@ -10,10 +10,7 @@
       "check_interval": 30,
       "folders": [
         "INBOX"
-      ],
-      "filter_mode": "none",
-      "whitelist": [],
-      "blacklist": []
+      ]
     }
   ],
   "webhooks": [
@@ -32,6 +29,20 @@
       "source_account": "all",
       "target_webhook": "wh_17700000000",
       "filters": [],
+      "filter_rule_ids": [],
+      "enabled": true
+    }
+  ],
+  "filter_rules": [
+    {
+      "id": "filter_17700000000",
+      "name": "屏蔽营销邮件",
+      "type": "content",
+      "mode": "blacklist",
+      "patterns": [
+        "unsubscribe",
+        "退订"
+      ],
       "enabled": true
     }
   ],

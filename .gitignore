@@ -6,6 +6,7 @@
 # Build and Dependencies
 email2feishu
 mail2webhook
+.gocache/
 *.exe
 *.out
 *.app
