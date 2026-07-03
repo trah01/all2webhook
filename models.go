@@ -20,12 +20,13 @@ type EmailAccount struct {
 
 // WebhookTarget Webhook 目标配置
 type WebhookTarget struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"` // "feishu", "slack", "discord", "custom", "email"
-	URL      string `json:"url"`
-	Enabled  bool   `json:"enabled"`
-	Template string `json:"template"` // 自定义模板
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Type          string `json:"type"` // "feishu", "slack", "discord", "custom", "email"
+	URL           string `json:"url"`
+	Enabled       bool   `json:"enabled"`
+	Template      string `json:"template"`        // 自定义模板
+	SmtpAccountID string `json:"smtp_account_id"` // 邮件类型：指定 SMTP 发信账号ID
 }
 
 // ForwardRule 转发规则

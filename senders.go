@@ -238,19 +238,48 @@ func sendToWeCom(webhookURL, subject, from, date, body string) error {
 }
 
 func sendToEmailNotification(recipient string, accounts map[string]EmailAccount, subject, from, date, body string) error {
-	recipient = strings.TrimSpace(recipient)
-	if recipient == "" || !strings.Contains(recipient, "@") {
+	return sendToEmailNotificationWithAccount(recipient, "", accounts, subject, from, date, body)
+}
+
+func sendToEmailNotificationWithAccount(recipient string, smtpAccountID string, accounts map[string]EmailAccount, subject, from, date, body string) error {
+	// 支持多个收件人（逗号分隔）
+	parts := strings.Split(recipient, ",")
+	var recipients []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" && strings.Contains(p, "@") {
+			recipients = append(recipients, p)
+		}
+	}
+	if len(recipients) == 0 {
 		return fmt.Errorf("邮件通知目标需要填写收件邮箱地址")
 	}
 
-	account, ok := selectSMTPAccount(accounts, recipient)
+	var account EmailAccount
+	var ok bool
+
+	// 优先使用指定的 SMTP 账号
+	if smtpAccountID != "" {
+		if acc, exists := accounts[smtpAccountID]; exists {
+			acc = normalizeEmailAccount(acc)
+			if acc.Type == "smtp" && acc.Enabled {
+				account = acc
+				ok = true
+			}
+		}
+	}
+
+	// 否则自动选择
+	if !ok {
+		account, ok = selectSMTPAccount(accounts, recipients[0])
+	}
 	if !ok {
 		return fmt.Errorf("未配置可用的 SMTP 发信账号")
 	}
 
 	messageSubject := "[All2Webhook] " + subject
 	messageBody := fmt.Sprintf("主题：%s\n发送人：%s\n时间：%s\n\n%s", subject, from, date, body)
-	return sendSMTPMail(account, []string{recipient}, messageSubject, messageBody)
+	return sendSMTPMail(account, recipients, messageSubject, messageBody)
 }
 
 func testSMTPAccount(account EmailAccount) error {

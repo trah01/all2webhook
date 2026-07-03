@@ -10,23 +10,48 @@ const defaultSenderFilterIDs = new Set(['default_sender_blacklist', 'default_sen
 let currentFilterDefaultSender = false;
 
 // ===================== Navigation =====================
-document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById(tab.dataset.page).classList.add('active');
+function navigateToPage(page) {
+    // Clear all active states
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab-dropdown-item').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab-group').forEach(g => g.classList.remove('child-active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
 
-        // Load data for the page
-        switch (tab.dataset.page) {
-            case 'accounts': loadAccounts(); break;
-            case 'projects': loadProjects(); break;
-            case 'webhooks': loadWebhooks(); break;
-            case 'filters': loadFilters(); break;
-            case 'rules': loadRules(); break;
-            case 'history': loadHistory(); break;
-        }
-    });
+    // Activate the page
+    const pageEl = document.getElementById(page);
+    if (pageEl) pageEl.classList.add('active');
+
+    // Activate the matching tab or dropdown item
+    const directTab = document.querySelector(`.nav-tab[data-page="${page}"]`);
+    if (directTab) {
+        directTab.classList.add('active');
+    }
+    const dropdownItem = document.querySelector(`.nav-tab-dropdown-item[data-page="${page}"]`);
+    if (dropdownItem) {
+        dropdownItem.classList.add('active');
+        const group = dropdownItem.closest('.nav-tab-group');
+        if (group) group.classList.add('child-active');
+    }
+
+    // Load data for the page
+    switch (page) {
+        case 'accounts': loadAccounts(); break;
+        case 'projects': loadProjects(); break;
+        case 'webhooks': loadWebhooks(); break;
+        case 'filters': loadFilters(); break;
+        case 'rules': loadRules(); break;
+        case 'history': loadHistory(); break;
+    }
+}
+
+// Direct tabs (with data-page, not triggers)
+document.querySelectorAll('.nav-tab[data-page]').forEach(tab => {
+    tab.addEventListener('click', () => navigateToPage(tab.dataset.page));
+});
+
+// Dropdown items
+document.querySelectorAll('.nav-tab-dropdown-item[data-page]').forEach(item => {
+    item.addEventListener('click', () => navigateToPage(item.dataset.page));
 });
 
 // ===================== API Calls =====================
@@ -414,7 +439,7 @@ function renderWebhooks() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    暂无 Webhook，点击上方按钮添加
+                    暂无目标渠道，点击上方按钮添加
                 </td>
             </tr>
         `;
@@ -428,15 +453,26 @@ function renderWebhooks() {
         slack: 'Slack',
         discord: 'Discord',
         custom: '自定义',
-        email: '收件人'
+        email: '邮件收件人'
     };
 
-    tbody.innerHTML = webhooks.map(wh => `
+    tbody.innerHTML = webhooks.map(wh => {
+        let urlDisplay;
+        if (wh.type === 'email') {
+            const emails = wh.url.split(',').map(s => s.trim()).filter(s => s);
+            urlDisplay = emails.map(e => `<span class="tag tag-neutral">${escapeHtml(e)}</span>`).join(' ');
+            if (emails.length > 3) {
+                urlDisplay = emails.slice(0, 3).map(e => `<span class="tag tag-neutral">${escapeHtml(e)}</span>`).join(' ') + ` <span class="tag tag-neutral">+${emails.length - 3}</span>`;
+            }
+        } else {
+            urlDisplay = escapeHtml(wh.url.substring(0, 40)) + (wh.url.length > 40 ? '...' : '');
+        }
+        return `
         <tr>
             <td><strong>${escapeHtml(wh.name)}</strong></td>
             <td><span class="tag tag-info">${typeNames[wh.type] || wh.type}</span></td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
-                ${escapeHtml(wh.url.substring(0, 40))}${wh.url.length > 40 ? '...' : ''}
+            <td style="max-width: 240px; overflow: hidden; text-overflow: ellipsis;">
+                ${urlDisplay}
             </td>
             <td>
                 <span class="tag ${wh.enabled ? 'tag-success' : 'tag-neutral'}">
@@ -449,32 +485,64 @@ function renderWebhooks() {
                 <button class="btn btn-danger btn-sm" onclick="deleteWebhook('${wh.id}')">删除</button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function openWebhookModal(data = null) {
-    document.getElementById('webhook-modal-title').textContent = data ? '编辑 Webhook' : '添加 Webhook';
+    document.getElementById('webhook-modal-title').textContent = data ? '编辑目标渠道' : '添加目标渠道';
     document.getElementById('webhook-id').value = data?.id || '';
     document.getElementById('webhook-name').value = data?.name || '';
     document.getElementById('webhook-type').value = data?.type || 'feishu';
-    document.getElementById('webhook-url').value = data?.url || '';
+    document.getElementById('webhook-url').value = (data?.type !== 'email' ? data?.url : '') || '';
     document.getElementById('webhook-enabled').checked = data?.enabled !== false;
+
+    // Populate email recipients textarea
+    const recipientsEl = document.getElementById('webhook-email-recipients');
+    if (data?.type === 'email' && data?.url) {
+        // url stores comma-separated emails
+        recipientsEl.value = data.url.split(',').map(s => s.trim()).filter(s => s).join('\n');
+    } else {
+        recipientsEl.value = '';
+    }
+
+    // Populate SMTP account selector
+    populateSmtpAccountSelector(data?.smtp_account_id || '');
+
     updateWebhookTargetFields();
     document.getElementById('webhook-modal').classList.add('active');
 }
 
+async function populateSmtpAccountSelector(selectedId) {
+    const select = document.getElementById('webhook-smtp-account');
+    if (!select) return;
+    select.innerHTML = '<option value="">自动选择</option>';
+    try {
+        const accs = await api('GET', '/api/accounts');
+        if (Array.isArray(accs)) {
+            accs.filter(a => a.type === 'smtp' && a.enabled).forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.textContent = `${a.name} (${a.email_user})`;
+                if (a.id === selectedId) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        // Silently fail, selector will just show "自动选择"
+    }
+}
+
 function updateWebhookTargetFields() {
     const type = document.getElementById('webhook-type')?.value || 'feishu';
-    const label = document.getElementById('webhook-url-label');
-    const input = document.getElementById('webhook-url');
-    if (!label || !input) return;
-    if (type === 'email') {
-        label.textContent = '收件邮箱地址（使用 SMTP 发信账号发送）';
-        input.placeholder = 'notify@example.com';
-    } else {
-        label.textContent = 'Webhook URL';
-        input.placeholder = 'https://...';
-    }
+    const isEmail = type === 'email';
+
+    // Toggle URL field vs email fields
+    document.querySelectorAll('.webhook-url-field').forEach(el => {
+        el.style.display = isEmail ? 'none' : '';
+    });
+    document.querySelectorAll('.webhook-email-field').forEach(el => {
+        el.style.display = isEmail ? '' : 'none';
+    });
 }
 
 function editWebhook(id) {
@@ -484,12 +552,31 @@ function editWebhook(id) {
 
 async function saveWebhook() {
     const id = document.getElementById('webhook-id').value;
+    const type = document.getElementById('webhook-type').value;
+
+    let url;
+    if (type === 'email') {
+        // Gather emails from textarea, join with comma
+        const emails = document.getElementById('webhook-email-recipients').value
+            .split('\n')
+            .map(s => s.trim())
+            .filter(s => s && s.includes('@'));
+        if (emails.length === 0) {
+            await showAppAlert('请至少填写一个收件人邮箱地址', { type: 'warning', title: '收件人为空' });
+            return;
+        }
+        url = emails.join(',');
+    } else {
+        url = document.getElementById('webhook-url').value;
+    }
+
     const data = {
         id: id || undefined,
         name: document.getElementById('webhook-name').value,
-        type: document.getElementById('webhook-type').value,
-        url: document.getElementById('webhook-url').value,
-        enabled: document.getElementById('webhook-enabled').checked
+        type,
+        url,
+        enabled: document.getElementById('webhook-enabled').checked,
+        smtp_account_id: type === 'email' ? (document.getElementById('webhook-smtp-account')?.value || '') : ''
     };
 
     try {

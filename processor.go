@@ -118,7 +118,7 @@ func processPendingMessages() {
 				case "custom":
 					sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "email":
-					sendErr = sendToEmailNotification(webhook.URL, accounts, subjectForSend, senderForSend, dateStr, displayBody)
+					sendErr = sendToEmailNotificationWithAccount(webhook.URL, webhook.SmtpAccountID, accounts, subjectForSend, senderForSend, dateStr, displayBody)
 				default:
 					sendErr = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
 				}

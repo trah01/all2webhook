@@ -117,6 +117,116 @@ body {
     background: transparent;
 }
 
+/* Nav Tab Groups (Dropdown) */
+.nav-tab-group {
+    position: relative;
+}
+
+.nav-tab-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.nav-tab-arrow {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.nav-tab-group:hover .nav-tab-arrow,
+.nav-tab-group.open .nav-tab-arrow {
+    transform: rotate(180deg);
+    opacity: 1;
+}
+
+.nav-tab-group:hover .nav-tab-trigger,
+.nav-tab-group.open .nav-tab-trigger {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+}
+
+.nav-tab-group.child-active .nav-tab-trigger {
+    color: var(--accent);
+}
+
+.nav-tab-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    min-width: 160px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    z-index: 200;
+    animation: navDropdownIn 0.15s ease;
+}
+
+.nav-tab-group:hover .nav-tab-dropdown,
+.nav-tab-group.open .nav-tab-dropdown {
+    display: block;
+}
+
+@keyframes navDropdownIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.nav-tab-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 14px;
+    border: none;
+    background: transparent;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 7px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.nav-tab-dropdown-item svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    opacity: 0.6;
+}
+
+.nav-tab-dropdown-item:hover {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+}
+
+.nav-tab-dropdown-item:hover svg {
+    opacity: 1;
+}
+
+.nav-tab-dropdown-item.active {
+    color: var(--accent);
+    background: rgba(0, 122, 255, 0.06);
+}
+
+.nav-tab-dropdown-item.active svg {
+    opacity: 1;
+    color: var(--accent);
+}
+
 .nav-status {
     margin-left: auto;
     display: flex;
@@ -499,6 +609,13 @@ textarea.form-input {
     width: 18px;
     height: 18px;
     accent-color: var(--accent);
+}
+
+.form-hint {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    margin-top: 6px;
+    line-height: 1.4;
 }
 
 .template-grid {

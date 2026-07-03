@@ -21,11 +21,39 @@
 
             <div class="nav-tabs">
                 <button class="nav-tab active" data-page="dashboard">仪表盘</button>
-                <button class="nav-tab" data-page="accounts">邮箱账号</button>
-                <button class="nav-tab" data-page="projects">接收项目</button>
-                <button class="nav-tab" data-page="webhooks">Webhook</button>
-                <button class="nav-tab" data-page="filters">过滤规则</button>
-                <button class="nav-tab" data-page="rules">转发规则</button>
+                <div class="nav-tab-group">
+                    <button class="nav-tab nav-tab-trigger" data-group="sources">
+                        数据源
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-tab-arrow"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="nav-tab-dropdown">
+                        <button class="nav-tab-dropdown-item" data-page="accounts">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            邮箱账号
+                        </button>
+                        <button class="nav-tab-dropdown-item" data-page="projects">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            接收项目
+                        </button>
+                    </div>
+                </div>
+                <button class="nav-tab" data-page="webhooks">目标渠道</button>
+                <div class="nav-tab-group">
+                    <button class="nav-tab nav-tab-trigger" data-group="rules">
+                        规则配置
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-tab-arrow"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="nav-tab-dropdown">
+                        <button class="nav-tab-dropdown-item" data-page="filters">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                            过滤规则
+                        </button>
+                        <button class="nav-tab-dropdown-item" data-page="rules">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                            转发规则
+                        </button>
+                    </div>
+                </div>
                 <button class="nav-tab" data-page="history">历史记录</button>
             </div>
 
@@ -528,14 +556,26 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group webhook-url-field">
                         <label class="form-label" id="webhook-url-label">Webhook URL</label>
                         <input type="text" class="form-input" id="webhook-url" placeholder="https://...">
+                    </div>
+                    <div class="form-group webhook-email-field" style="display:none;">
+                        <label class="form-label">收件人邮箱地址（每行一个）</label>
+                        <textarea class="form-input" id="webhook-email-recipients" rows="4" placeholder="user1@example.com&#10;user2@example.com"></textarea>
+                        <div class="form-hint">使用 SMTP 发信账号发送通知邮件到以上收件人</div>
+                    </div>
+                    <div class="form-group webhook-email-field" style="display:none;">
+                        <label class="form-label">指定 SMTP 发信账号（可选）</label>
+                        <select class="form-input" id="webhook-smtp-account">
+                            <option value="">自动选择</option>
+                        </select>
+                        <div class="form-hint">留空则自动选择可用的 SMTP 账号</div>
                     </div>
                     <div class="form-group">
                         <label class="form-checkbox">
                             <input type="checkbox" id="webhook-enabled" checked>
-                            <span>启用此 Webhook</span>
+                            <span>启用此目标渠道</span>
                         </label>
                     </div>
                 </form>

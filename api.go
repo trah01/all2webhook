@@ -660,7 +660,7 @@ func setupAPI(r *gin.Engine) {
 				accountMap[account.ID] = account
 			}
 			configLock.RUnlock()
-			err = sendToEmailNotification(webhook.URL, accountMap, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
+			err = sendToEmailNotificationWithAccount(webhook.URL, webhook.SmtpAccountID, accountMap, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
 		default:
 			err = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
 		}
