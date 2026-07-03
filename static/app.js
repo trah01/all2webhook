@@ -428,7 +428,7 @@ function renderWebhooks() {
         slack: 'Slack',
         discord: 'Discord',
         custom: '自定义',
-        email: '邮件通知'
+        email: '收件人'
     };
 
     tbody.innerHTML = webhooks.map(wh => `
@@ -469,7 +469,7 @@ function updateWebhookTargetFields() {
     const input = document.getElementById('webhook-url');
     if (!label || !input) return;
     if (type === 'email') {
-        label.textContent = '收件邮箱地址';
+        label.textContent = '收件邮箱地址（使用 SMTP 发信账号发送）';
         input.placeholder = 'notify@example.com';
     } else {
         label.textContent = 'Webhook URL';

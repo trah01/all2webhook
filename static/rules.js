@@ -112,20 +112,7 @@ function normalizeRuleSources(rule) {
     return result;
 }
 
-function smtpTargetID(accountID) {
-    return `smtp:${accountID}`;
-}
-
-function getSMTPNotificationAccounts() {
-    return accounts.filter(account => account.type === 'smtp' && account.enabled);
-}
-
 function displayRuleTarget(targetID) {
-    if (targetID?.startsWith('smtp:')) {
-        const accountID = targetID.slice(5);
-        const account = accounts.find(item => item.id === accountID);
-        return account ? (account.name || account.email_user || 'SMTP 发信账号') : '';
-    }
     return webhooks.find(webhook => webhook.id === targetID)?.name || '';
 }
 
@@ -137,7 +124,7 @@ function displayWebhookType(type) {
         slack: 'Slack',
         discord: 'Discord',
         custom: '自定义',
-        email: '邮件通知'
+        email: '收件人'
     };
     return names[type] || type || '未知类型';
 }
@@ -238,13 +225,12 @@ function renderRuleTargetDropdown(selectedIDs = []) {
     const menu = document.getElementById('rule-target-menu');
     if (!menu) return;
     const selectedSet = new Set(selectedIDs);
-    const smtpAccounts = getSMTPNotificationAccounts();
-    if (!webhooks.length && !smtpAccounts.length) {
-        menu.innerHTML = '<div class="filter-empty">暂无通知渠道，请先添加 Webhook 或 SMTP 发信账号</div>';
+    if (!webhooks.length) {
+        menu.innerHTML = '<div class="filter-empty">暂无通知渠道，请先添加 Webhook 或收件人渠道</div>';
         updateRuleTargetSummary();
         return;
     }
-    const webhookOptions = webhooks.map(webhook => `
+    menu.innerHTML = webhooks.map(webhook => `
         <label class="filter-option">
             <input type="checkbox" class="rule-target-checkbox" value="${escapeHtml(webhook.id)}"
                 ${selectedSet.has(webhook.id) ? 'checked' : ''} onchange="updateRuleTargetSummary()">
@@ -254,20 +240,6 @@ function renderRuleTargetDropdown(selectedIDs = []) {
             </span>
         </label>
     `).join('');
-    const smtpOptions = smtpAccounts.map(account => {
-        const targetID = smtpTargetID(account.id);
-        return `
-            <label class="filter-option">
-                <input type="checkbox" class="rule-target-checkbox" value="${escapeHtml(targetID)}"
-                    ${selectedSet.has(targetID) ? 'checked' : ''} onchange="updateRuleTargetSummary()">
-                <span class="filter-option-main">
-                    <span class="filter-option-title">${escapeHtml(account.name || account.email_user || 'SMTP 发信账号')}</span>
-                    <span class="filter-option-meta">SMTP 发信 / 发送到 ${escapeHtml(account.email_user || '-')}</span>
-                </span>
-            </label>
-        `;
-    }).join('');
-    menu.innerHTML = webhookOptions + smtpOptions;
     updateRuleTargetSummary();
 }
 

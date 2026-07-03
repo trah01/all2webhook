@@ -37,7 +37,7 @@
     },
     {
       "id": "wh_email_17700000000",
-      "name": "邮件通知",
+      "name": "收件人",
       "type": "email",
       "url": "notify@example.com",
       "enabled": true
