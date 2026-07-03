@@ -81,10 +81,11 @@ body {
     letter-spacing: -0.02em;
 }
 
-.nav-brand svg {
-    width: 24px;
-    height: 24px;
-    color: var(--text-primary);
+.nav-logo {
+    width: 26px;
+    height: 26px;
+    display: block;
+    flex: 0 0 26px;
 }
 
 .nav-tabs {
