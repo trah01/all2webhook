@@ -83,7 +83,7 @@ function displayRuleSource(sourceID) {
     const acc = accounts.find(a => a.id === sourceID);
     if (acc) return acc.name || acc.email_user || '邮箱账号';
     const project = inboundProjects.find(p => p.id === sourceID);
-    if (project) return project.name || '接收项目';
+    if (project) return project.name || '接收入口';
     return '未知来源';
 }
 
@@ -164,8 +164,8 @@ function renderRuleSourceDropdown(selectedIDs = ['all']) {
             <input type="checkbox" class="rule-source-checkbox" value="${escapeHtml(project.id)}"
                 ${selectedSet.has(project.id) ? 'checked' : ''} onchange="updateRuleSourceSummary(this)">
             <span class="filter-option-main">
-                <span class="filter-option-title">${escapeHtml(project.name || '接收项目')}</span>
-                <span class="filter-option-meta">接收项目 / ${project.enabled ? '已启用' : '已禁用'}</span>
+                <span class="filter-option-title">${escapeHtml(project.name || '接收入口')}</span>
+                <span class="filter-option-meta">接收入口 / ${project.enabled ? '已启用' : '已禁用'}</span>
             </span>
         </label>
     `).join('');
@@ -176,7 +176,7 @@ function renderRuleSourceDropdown(selectedIDs = ['all']) {
                 ${selectedSet.has('all') ? 'checked' : ''} onchange="updateRuleSourceSummary(this)">
             <span class="filter-option-main">
                 <span class="filter-option-title">所有来源</span>
-                <span class="filter-option-meta">匹配所有 IMAP 收件账号和接收项目</span>
+                <span class="filter-option-meta">匹配所有 IMAP 收件账号和接收入口</span>
             </span>
         </label>
         ${accountOptions}

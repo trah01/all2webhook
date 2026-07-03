@@ -36,7 +36,7 @@ const filterTemplates = [
         patterns: ['cron', 'debug', 'heartbeat', 'health check', '监控恢复', '测试通知']
     },
     {
-        name: '只转发接收项目通知',
+        name: '只转发接收入口通知',
         type: 'source',
         mode: 'whitelist',
         patterns: ['webhook']

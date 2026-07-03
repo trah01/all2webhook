@@ -20,7 +20,7 @@ function renderProjects() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    暂无接收项目，点击上方按钮添加
+                    暂无接收入口，点击上方按钮添加
                 </td>
             </tr>
         `;
@@ -54,7 +54,7 @@ function renderProjects() {
 
 function openProjectModal(id = '') {
     const project = projects.find(item => item.id === id);
-    document.getElementById('project-modal-title').textContent = project ? '编辑接收项目' : '添加接收项目';
+    document.getElementById('project-modal-title').textContent = project ? '编辑接收入口' : '添加接收入口';
     document.getElementById('project-id').value = project?.id || '';
     document.getElementById('project-name').value = project?.name || '';
     document.getElementById('project-enabled').checked = project?.enabled !== false;
@@ -97,7 +97,7 @@ async function rotateProjectSecret(id) {
 }
 
 async function deleteProject(id) {
-    if (!(await showAppConfirm('确定删除此接收项目吗？相关接收 URL 将不可用。', { title: '删除接收项目', confirmText: '删除' }))) return;
+    if (!(await showAppConfirm('确定删除此接收入口吗？相关接收 URL 将不可用。', { title: '删除接收入口', confirmText: '删除' }))) return;
     try {
         await api('DELETE', `/api/projects/${id}`);
         await loadProjects();
