@@ -246,18 +246,18 @@
             </div>
         </div>
 
-        <!-- Webhooks Page -->
+        <!-- Targets Page -->
         <div id="webhooks" class="page">
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">Webhook 目标管理</h2>
+                    <h2 class="card-title">目标渠道管理</h2>
                     <button class="btn btn-primary" onclick="openWebhookModal()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                             stroke-linecap="round" stroke-linejoin="round">
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
-                        添加 Webhook
+                        添加渠道
                     </button>
                 </div>
                 <div class="card-body">
@@ -267,7 +267,7 @@
                                 <tr>
                                     <th>名称</th>
                                     <th>类型</th>
-                                    <th>URL</th>
+                                    <th>目标地址</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>
@@ -522,11 +522,11 @@
         </div>
     </div>
 
-    <!-- Webhook Modal -->
+    <!-- Target Channel Modal -->
     <div id="webhook-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 class="modal-title" id="webhook-modal-title">添加 Webhook</h3>
+                <h3 class="modal-title" id="webhook-modal-title">添加目标渠道</h3>
                 <button class="modal-close" onclick="closeModal('webhook-modal')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -551,13 +551,13 @@
                                 <option value="wecom">企业微信</option>
                                 <option value="slack">Slack</option>
                                 <option value="discord">Discord</option>
-                                <option value="custom">自定义</option>
+                                <option value="custom">自定义 Webhook</option>
                                 <option value="email">收件人（使用 SMTP 发送）</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group webhook-url-field">
-                        <label class="form-label" id="webhook-url-label">Webhook URL</label>
+                        <label class="form-label" id="webhook-url-label">目标 URL</label>
                         <input type="text" class="form-input" id="webhook-url" placeholder="https://...">
                     </div>
                     <div class="form-group webhook-email-field" style="display:none;">

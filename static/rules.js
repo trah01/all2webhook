@@ -123,8 +123,8 @@ function displayWebhookType(type) {
         wecom: '企业微信',
         slack: 'Slack',
         discord: 'Discord',
-        custom: '自定义',
-        email: '收件人'
+        custom: '自定义 Webhook',
+        email: '邮件收件人'
     };
     return names[type] || type || '未知类型';
 }
@@ -226,7 +226,7 @@ function renderRuleTargetDropdown(selectedIDs = []) {
     if (!menu) return;
     const selectedSet = new Set(selectedIDs);
     if (!webhooks.length) {
-        menu.innerHTML = '<div class="filter-empty">暂无通知渠道，请先添加 Webhook 或收件人渠道</div>';
+        menu.innerHTML = '<div class="filter-empty">暂无目标渠道，请先在「目标渠道」页面添加</div>';
         updateRuleTargetSummary();
         return;
     }

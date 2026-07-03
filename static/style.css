@@ -154,10 +154,9 @@ body {
 .nav-tab-dropdown {
     display: none;
     position: absolute;
-    top: 100%;
+    top: calc(100% + 4px);
     left: 50%;
     transform: translateX(-50%);
-    margin-top: 4px;
     min-width: 160px;
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -166,6 +165,16 @@ body {
     padding: 6px;
     z-index: 200;
     animation: navDropdownIn 0.15s ease;
+}
+
+/* 在 trigger 与 dropdown 之间创建一个不可见的桥接区域，防止鼠标移动时 hover 断开 */
+.nav-tab-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 10px;
 }
 
 .nav-tab-group:hover .nav-tab-dropdown,

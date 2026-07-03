@@ -452,7 +452,7 @@ function renderWebhooks() {
         wecom: '企业微信',
         slack: 'Slack',
         discord: 'Discord',
-        custom: '自定义',
+        custom: '自定义 Webhook',
         email: '邮件收件人'
     };
 
@@ -593,7 +593,7 @@ async function saveWebhook() {
 }
 
 async function deleteWebhook(id) {
-    if (!(await showAppConfirm('确定要删除此 Webhook 吗？', { title: '删除 Webhook', confirmText: '删除' }))) return;
+    if (!(await showAppConfirm('确定要删除此目标渠道吗？', { title: '删除目标渠道', confirmText: '删除' }))) return;
     try {
         await api('DELETE', `/api/webhooks/${id}`);
         loadWebhooks();
