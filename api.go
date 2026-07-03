@@ -226,6 +226,18 @@ func setupAPI(r *gin.Engine) {
 					safeWebhooks[i].URL = "********"
 				}
 			}
+			if wh.Secret != "" {
+				safeWebhooks[i].Secret = "********"
+			}
+			if wh.Token != "" {
+				safeWebhooks[i].Token = "********"
+			}
+			if wh.Headers != "" {
+				safeWebhooks[i].Headers = "********"
+			}
+			if wh.TLSClientKey != "" {
+				safeWebhooks[i].TLSClientKey = "********"
+			}
 		}
 		c.JSON(http.StatusOK, safeWebhooks)
 	})
@@ -243,6 +255,19 @@ func setupAPI(r *gin.Engine) {
 		if strings.Contains(webhook.URL, "********") {
 			webhook.URL = ""
 		}
+		if webhook.Secret == "********" {
+			webhook.Secret = ""
+		}
+		if webhook.Token == "********" {
+			webhook.Token = ""
+		}
+		if webhook.Headers == "********" {
+			webhook.Headers = ""
+		}
+		if webhook.TLSClientKey == "********" {
+			webhook.TLSClientKey = ""
+		}
+		webhook = normalizeWebhookTarget(webhook)
 		config.Webhooks = append(config.Webhooks, webhook)
 		saveConfigNoLock()
 		configLock.Unlock()
@@ -264,6 +289,19 @@ func setupAPI(r *gin.Engine) {
 				if strings.Contains(webhook.URL, "********") {
 					webhook.URL = wh.URL
 				}
+				if webhook.Secret == "********" {
+					webhook.Secret = wh.Secret
+				}
+				if webhook.Token == "********" {
+					webhook.Token = wh.Token
+				}
+				if webhook.Headers == "********" {
+					webhook.Headers = wh.Headers
+				}
+				if webhook.TLSClientKey == "********" {
+					webhook.TLSClientKey = wh.TLSClientKey
+				}
+				webhook = normalizeWebhookTarget(webhook)
 				config.Webhooks[i] = webhook
 				break
 			}
@@ -639,31 +677,15 @@ func setupAPI(r *gin.Engine) {
 			return
 		}
 
-		var err error
-		switch webhook.Type {
-		case "feishu":
-			err = sendToFeishu(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		case "dingtalk":
-			err = sendToDingTalk(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		case "wecom":
-			err = sendToWeCom(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		case "slack":
-			err = sendToSlack(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		case "discord":
-			err = sendToDiscord(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		case "custom":
-			err = sendToCustomWebhook(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		case "email":
-			accountMap := make(map[string]EmailAccount)
+		accountMap := make(map[string]EmailAccount)
+		if webhook.Type == "email" {
 			configLock.RLock()
 			for _, account := range config.Accounts {
 				accountMap[account.ID] = account
 			}
 			configLock.RUnlock()
-			err = sendToEmailNotificationWithAccount(webhook.URL, webhook.SmtpAccountID, accountMap, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
-		default:
-			err = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
 		}
+		err := sendToWebhookTarget(*webhook, accountMap, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
 
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{"success": false, "error": err.Error()})

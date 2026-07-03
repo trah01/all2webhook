@@ -510,8 +510,8 @@
     </div>
 
     <!-- Target Channel Modal -->
-    <div id="webhook-modal" class="modal-overlay">
-        <div class="modal">
+    <div id="webhook-modal" class="modal-overlay drawer-overlay">
+        <div class="modal drawer-panel webhook-drawer">
             <div class="modal-header">
                 <h3 class="modal-title" id="webhook-modal-title">添加目标渠道</h3>
                 <button class="modal-close" onclick="closeModal('webhook-modal')">
@@ -538,6 +538,16 @@
                                 <option value="wecom">企业微信</option>
                                 <option value="slack">Slack</option>
                                 <option value="discord">Discord</option>
+                                <option value="teams">Microsoft Teams</option>
+                                <option value="mattermost">Mattermost</option>
+                                <option value="gotify">Gotify</option>
+                                <option value="bark">Bark</option>
+                                <option value="serverchan">Server 酱</option>
+                                <option value="telegram">Telegram</option>
+                                <option value="ntfy">ntfy</option>
+                                <option value="pushplus">PushPlus</option>
+                                <option value="chanify">Chanify</option>
+                                <option value="pushover">Pushover</option>
                                 <option value="custom">自定义 Webhook</option>
                                 <option value="email">收件人（使用 SMTP 发送）</option>
                             </select>
@@ -547,6 +557,100 @@
                         <label class="form-label" id="webhook-url-label">目标 URL</label>
                         <input type="text" class="form-input" id="webhook-url" placeholder="https://...">
                     </div>
+                    <div class="form-row webhook-http-field">
+                        <div class="form-group webhook-secret-field" style="display:none;">
+                            <label class="form-label">加签密钥 Secret</label>
+                            <input type="password" class="form-input" id="webhook-secret" placeholder="SEC...">
+                            <div class="form-hint">钉钉自定义机器人开启加签后填写</div>
+                        </div>
+                        <div class="form-group webhook-token-field" style="display:none;">
+                            <label class="form-label">Token</label>
+                            <input type="password" class="form-input" id="webhook-token" placeholder="可选">
+                        </div>
+                    </div>
+                    <div class="form-row webhook-http-field">
+                        <div class="form-group webhook-payload-field">
+                            <label class="form-label">Payload 类型</label>
+                            <select class="form-input" id="webhook-payload-type"></select>
+                        </div>
+                        <div class="form-group webhook-priority-field" style="display:none;">
+                            <label class="form-label">优先级</label>
+                            <input type="number" class="form-input" id="webhook-priority" min="0" max="10" value="5">
+                        </div>
+                    </div>
+                    <div class="form-row webhook-profile-field" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label">发送名称</label>
+                            <input type="text" class="form-input" id="webhook-username" placeholder="All2Webhook">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">头像 URL</label>
+                            <input type="text" class="form-input" id="webhook-icon-url" placeholder="https://...">
+                        </div>
+                    </div>
+                    <div class="form-group webhook-link-field" style="display:none;">
+                        <label class="form-label">卡片跳转 URL</label>
+                        <input type="text" class="form-input" id="webhook-link-url" placeholder="https://...">
+                        <div class="form-hint">用于 ActionCard、FeedCard、企业微信 news、Teams 卡片按钮等需要点击链接的 payload</div>
+                    </div>
+                    <div class="form-row webhook-telegram-field" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label">Chat ID / User Key</label>
+                            <input type="text" class="form-input" id="webhook-chat-id" placeholder="-100xxxxxxxxxx 或 Pushover User Key">
+                        </div>
+                    </div>
+                    <div class="form-group webhook-mention-field" style="display:none;">
+                        <label class="form-label">提醒手机号（逗号分隔）</label>
+                        <input type="text" class="form-input" id="webhook-mention-mobiles" placeholder="13800000000,13900000000">
+                    </div>
+                    <div class="form-group webhook-wecom-mention-field" style="display:none;">
+                        <label class="form-label">企业微信 User ID（逗号分隔）</label>
+                        <input type="text" class="form-input" id="webhook-mention-user-ids" placeholder="zhangsan,lisi">
+                    </div>
+                    <div class="form-group webhook-mention-field" style="display:none;">
+                        <label class="form-checkbox">
+                            <input type="checkbox" id="webhook-mention-all">
+                            <span>提醒所有人</span>
+                        </label>
+                    </div>
+                    <div class="form-group webhook-http-field">
+                        <div class="form-label-row">
+                            <label class="form-label">自定义 JSON Payload（可选）</label>
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="fillWebhookTemplateSample()">填入示例模板</button>
+                        </div>
+                        <textarea class="form-input code-input" id="webhook-template" rows="9" placeholder="留空则使用所选渠道的默认 payload"></textarea>
+                        <div class="form-hint">支持占位符：{{subject}}、{{from}}、{{date}}、{{body}}</div>
+                    </div>
+                    <details class="advanced-section webhook-http-field">
+                        <summary>高级 HTTP 与证书配置</summary>
+                        <div class="advanced-section-body">
+                            <div class="form-group">
+                                <label class="form-label">自定义请求头 JSON</label>
+                                <textarea class="form-input code-input" id="webhook-headers" rows="3" placeholder="{&quot;Authorization&quot;:&quot;Bearer your_token_here&quot;}"></textarea>
+                                <div class="form-hint">适用于 ntfy、内网网关或需要额外鉴权头的自定义 Webhook</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">自定义 CA 证书 PEM</label>
+                                <textarea class="form-input code-input" id="webhook-tls-ca-cert" rows="4" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">客户端证书 PEM</label>
+                                    <textarea class="form-input code-input" id="webhook-tls-client-cert" rows="4" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">客户端私钥 PEM</label>
+                                    <textarea class="form-input code-input" id="webhook-tls-client-key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-checkbox">
+                                    <input type="checkbox" id="webhook-tls-skip-verify">
+                                    <span>跳过 TLS 证书校验（仅限内网测试）</span>
+                                </label>
+                            </div>
+                        </div>
+                    </details>
                     <div class="form-group webhook-email-field" style="display:none;">
                         <label class="form-label">收件人邮箱地址（每行一个）</label>
                         <textarea class="form-input" id="webhook-email-recipients" rows="4" placeholder="user1@example.com&#10;user2@example.com"></textarea>
@@ -744,6 +848,7 @@ unsubscribe
 
     <script src="/static/filter_templates.js"></script>
     <script src="/static/app.js"></script>
+    <script src="/static/webhooks.js"></script>
     <script src="/static/rules.js"></script>
     <script src="/static/projects.js"></script>
     <script src="/static/bootstrap.js"></script>

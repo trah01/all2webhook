@@ -28,6 +28,7 @@ func loadConfig() {
 	}
 	ensureDefaultSenderFilterRulesNoLock()
 	normalizeEmailAccountsNoLock()
+	normalizeWebhooksNoLock()
 	normalizeForwardRulesNoLock()
 	saveConfigNoLock()
 }
@@ -50,6 +51,35 @@ func normalizeEmailAccount(account EmailAccount) EmailAccount {
 		account.Folders = []string{"INBOX"}
 	}
 	return account
+}
+
+func normalizeWebhooksNoLock() {
+	for i := range config.Webhooks {
+		config.Webhooks[i] = normalizeWebhookTarget(config.Webhooks[i])
+	}
+}
+
+func normalizeWebhookTarget(target WebhookTarget) WebhookTarget {
+	target.Type = strings.ToLower(strings.TrimSpace(target.Type))
+	target.PayloadType = strings.ToLower(strings.TrimSpace(target.PayloadType))
+	target.Name = strings.TrimSpace(target.Name)
+	target.URL = strings.TrimSpace(target.URL)
+	target.Secret = strings.TrimSpace(target.Secret)
+	target.Token = strings.TrimSpace(target.Token)
+	target.ChatID = strings.TrimSpace(target.ChatID)
+	target.Username = strings.TrimSpace(target.Username)
+	target.IconURL = strings.TrimSpace(target.IconURL)
+	target.LinkURL = strings.TrimSpace(target.LinkURL)
+	target.MentionMobiles = strings.TrimSpace(target.MentionMobiles)
+	target.MentionUserIDs = strings.TrimSpace(target.MentionUserIDs)
+	target.Headers = strings.TrimSpace(target.Headers)
+	target.TLSCACert = strings.TrimSpace(target.TLSCACert)
+	target.TLSClientCert = strings.TrimSpace(target.TLSClientCert)
+	target.TLSClientKey = strings.TrimSpace(target.TLSClientKey)
+	if target.Type == "" {
+		target.Type = "custom"
+	}
+	return target
 }
 
 func normalizeForwardRulesNoLock() {

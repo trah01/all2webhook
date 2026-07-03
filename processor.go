@@ -104,24 +104,7 @@ func processPendingMessages() {
 					continue
 				}
 
-				switch webhook.Type {
-				case "feishu":
-					sendErr = sendToFeishu(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
-				case "dingtalk":
-					sendErr = sendToDingTalk(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
-				case "wecom":
-					sendErr = sendToWeCom(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
-				case "slack":
-					sendErr = sendToSlack(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
-				case "discord":
-					sendErr = sendToDiscord(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
-				case "custom":
-					sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
-				case "email":
-					sendErr = sendToEmailNotificationWithAccount(webhook.URL, webhook.SmtpAccountID, accounts, subjectForSend, senderForSend, dateStr, displayBody)
-				default:
-					sendErr = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
-				}
+				sendErr = sendToWebhookTarget(webhook, accounts, subjectForSend, senderForSend, dateStr, displayBody)
 
 				if sendErr != nil {
 					failedTargets = append(failedTargets, fmt.Sprintf("%s: %v", webhook.Name, sendErr))

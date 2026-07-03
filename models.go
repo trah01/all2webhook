@@ -20,13 +20,29 @@ type EmailAccount struct {
 
 // WebhookTarget Webhook 目标配置
 type WebhookTarget struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Type          string `json:"type"` // "feishu", "slack", "discord", "custom", "email"
-	URL           string `json:"url"`
-	Enabled       bool   `json:"enabled"`
-	Template      string `json:"template"`        // 自定义模板
-	SmtpAccountID string `json:"smtp_account_id"` // 邮件类型：指定 SMTP 发信账号ID
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"` // "feishu", "dingtalk", "wecom", "slack", "discord", "teams", "mattermost", "gotify", "bark", "serverchan", "telegram", "ntfy", "pushplus", "chanify", "pushover", "custom", "email"
+	URL            string `json:"url"`
+	Enabled        bool   `json:"enabled"`
+	Template       string `json:"template"`         // 自定义 JSON payload 模板
+	SmtpAccountID  string `json:"smtp_account_id"`  // 邮件类型：指定 SMTP 发信账号ID
+	Secret         string `json:"secret"`           // 钉钉/飞书等机器人加签密钥
+	PayloadType    string `json:"payload_type"`     // text, markdown, card, blocks, embeds 等
+	Token          string `json:"token"`            // Gotify/Bark/Telegram 等可选 token
+	ChatID         string `json:"chat_id"`          // Telegram chat_id
+	Username       string `json:"username"`         // Discord/Slack 自定义发送名称
+	IconURL        string `json:"icon_url"`         // Discord/Slack 头像
+	LinkURL        string `json:"link_url"`         // 卡片/图文消息点击跳转 URL
+	MentionAll     bool   `json:"mention_all"`      // 钉钉/企微 @所有人
+	MentionMobiles string `json:"mention_mobiles"`  // 钉钉/企微手机号，逗号分隔
+	MentionUserIDs string `json:"mention_user_ids"` // 企微 user_id，逗号分隔
+	Priority       int    `json:"priority"`         // Gotify 优先级
+	Headers        string `json:"headers"`          // 自定义 HTTP 请求头 JSON，例如 {"Authorization":"Bearer ..."}
+	TLSCACert      string `json:"tls_ca_cert"`      // 自定义 CA 证书 PEM
+	TLSClientCert  string `json:"tls_client_cert"`  // mTLS 客户端证书 PEM
+	TLSClientKey   string `json:"tls_client_key"`   // mTLS 客户端私钥 PEM
+	TLSSkipVerify  bool   `json:"tls_skip_verify"`  // 跳过 TLS 证书校验，仅用于内网测试
 }
 
 // ForwardRule 转发规则
