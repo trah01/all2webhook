@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   all2webhook:
-    build: .
+    image: trah01/all2webhook:latest
     container_name: all2webhook
     depends_on:
       - postgres

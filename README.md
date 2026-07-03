@@ -1,6 +1,14 @@
 # All2Webhook
 
-All2Webhook 是一个使用 Go 编写的通知集合转发服务。它保留 IMAP 邮件拉取能力，同时提供固定的公开接收 URL，用于接收 GitHub、飞书、Gotify、Bark、Server 酱、自定义 JSON 或其他 HTTP 通知，并根据规则转发到多个 Webhook 渠道。
+All2Webhook 是一个使用 Go 编写的通知集合转发为webhook服务，统一了大部分的推送渠道。
+
+现在的通知推送渠道实在是太多，而且每个应用或者项目都是只支持部分，甚至于有的想要更多推送渠道还得付费?！
+
+所以我开发了这个通知统一接收入口的项目，允许单个接收链接，接收各种不同格式的webhook推送方式然后转化成你想要的。同时允许配置邮箱，把邮件的通知也统一过来。
+
+目前支持 GitHub、飞书、钉钉、企微、discord、Gotify、Bark等等的规则解析，覆盖市面80%的通知，并根据规则转发到多个不同渠道。
+
+实在是不想存和记录那么多的推送链接了，管你有什么推送渠道，有一个我就转成我自己喜欢的渠道！
 
 ## 核心能力
 
@@ -14,9 +22,12 @@ All2Webhook 是一个使用 Go 编写的通知集合转发服务。它保留 IMA
 ## Docker Compose 启动
 
 ```bash
+mkdir -p all2webhook
 cd all2webhook
-修改compose文件的公开地址
-docker compose up -d --build
+wget -O docker-compose.yml https://git.trah.cn/trah01/all2webhook/raw/branch/main/docker-compose.yml
+vi docker-compose.yml
+docker compose pull
+docker compose up -d
 ```
 
 访问地址：
@@ -27,7 +38,7 @@ docker compose up -d --build
 
 - 公开接收地址：`https://all2webhook.example.com`
 
-部署前请把 `docker-compose.yml` 中的 `PUBLIC_BASE_URL` 改成自己的实际域名；接收项目生成的 URL 会使用这个域名。
+部署前请把 `docker-compose.yml` 中的 `PUBLIC_BASE_URL` 改成自己的实际域名；接收项目生成的 URL 会使用这个域名。Compose 文件默认使用 `trah01/all2webhook:latest` 镜像，不需要在服务器上克隆源码或本地构建镜像。
 
 查看状态和日志：
 
