@@ -66,6 +66,26 @@ func normalizeFilterRule(rule FilterRule) FilterRule {
 	return rule
 }
 
+func isDefaultSenderFilterID(id string) bool {
+	return id == DefaultSenderBlacklistID || id == DefaultSenderWhitelistID
+}
+
+func lockDefaultSenderFilterRule(rule FilterRule) FilterRule {
+	switch rule.ID {
+	case DefaultSenderBlacklistID:
+		rule.Name = "默认发送人黑名单"
+		rule.Type = filterTypeSender
+		rule.Mode = "blacklist"
+		rule.Enabled = true
+	case DefaultSenderWhitelistID:
+		rule.Name = "默认发送人白名单"
+		rule.Type = filterTypeSender
+		rule.Mode = "whitelist"
+		rule.Enabled = true
+	}
+	return normalizeFilterRule(rule)
+}
+
 func ensureDefaultSenderFilterRulesNoLock() {
 	ensureDefaultFilterRuleNoLock(FilterRule{
 		ID:       DefaultSenderBlacklistID,
@@ -89,12 +109,19 @@ func ensureDefaultFilterRuleNoLock(rule FilterRule) {
 	rule = normalizeFilterRule(rule)
 	for i, existing := range config.FilterRules {
 		if existing.ID == rule.ID {
-			existing.Name = rule.Name
-			existing.Type = rule.Type
-			existing.Mode = rule.Mode
-			config.FilterRules[i] = normalizeFilterRule(existing)
+			if isDefaultSenderFilterID(existing.ID) {
+				config.FilterRules[i] = lockDefaultSenderFilterRule(existing)
+			} else {
+				existing.Name = rule.Name
+				existing.Type = rule.Type
+				existing.Mode = rule.Mode
+				config.FilterRules[i] = normalizeFilterRule(existing)
+			}
 			return
 		}
+	}
+	if isDefaultSenderFilterID(rule.ID) {
+		rule = lockDefaultSenderFilterRule(rule)
 	}
 	config.FilterRules = append(config.FilterRules, rule)
 }

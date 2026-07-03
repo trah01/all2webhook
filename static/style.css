@@ -321,6 +321,11 @@ body {
     background: rgba(255, 59, 48, 0.2);
 }
 
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .btn-sm {
     padding: 6px 12px;
     font-size: 0.8rem;
@@ -477,6 +482,16 @@ textarea.form-input {
 .template-card:hover {
     border-color: var(--accent);
     background: var(--hover-bg);
+}
+
+.template-card:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.template-card:disabled:hover {
+    border-color: var(--card-border);
+    background: var(--bg-primary);
 }
 
 .template-title {

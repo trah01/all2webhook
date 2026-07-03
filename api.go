@@ -350,22 +350,36 @@ func setupAPI(r *gin.Engine) {
 			return
 		}
 		configLock.Lock()
+		var savedFilter FilterRule
+		found := false
 		for i, f := range config.FilterRules {
 			if f.ID == id {
+				found = true
+				if isDefaultSenderFilterID(id) {
+					config.FilterRules[i] = lockDefaultSenderFilterRule(f)
+					savedFilter = config.FilterRules[i]
+					break
+				}
 				filter.ID = id
 				filter = normalizeFilterRule(filter)
 				config.FilterRules[i] = filter
+				savedFilter = filter
 				break
 			}
 		}
+		if !found {
+			configLock.Unlock()
+			c.JSON(http.StatusNotFound, gin.H{"error": "filter not found"})
+			return
+		}
 		saveConfigNoLock()
 		configLock.Unlock()
-		c.JSON(http.StatusOK, filter)
+		c.JSON(http.StatusOK, savedFilter)
 	})
 
 	r.DELETE("/api/filters/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		if id == DefaultSenderBlacklistID || id == DefaultSenderWhitelistID {
+		if isDefaultSenderFilterID(id) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "默认发送人过滤规则不能删除"})
 			return
 		}

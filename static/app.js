@@ -7,6 +7,7 @@ let logs = [];
 let lastChecks = {};
 
 const defaultSenderFilterIDs = new Set(['default_sender_blacklist', 'default_sender_whitelist']);
+let currentFilterLocked = false;
 
 // ===================== Navigation =====================
 document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -506,7 +507,7 @@ function renderFilters() {
                 </span>
             </td>
             <td>
-                <button class="btn btn-secondary btn-sm" onclick="editFilter('${rule.id}')">编辑</button>
+                <button class="btn btn-secondary btn-sm" onclick="editFilter('${rule.id}')">${defaultSenderFilterIDs.has(rule.id) ? '查看' : '编辑'}</button>
                 ${defaultSenderFilterIDs.has(rule.id) ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteFilter('${rule.id}')">删除</button>`}
             </td>
         </tr>
@@ -521,7 +522,7 @@ function renderFilterTemplates() {
         const typeName = displayFilterType(template.type);
         const modeName = template.mode === 'blacklist' ? '黑名单' : '白名单';
         return `
-            <button class="template-card" type="button" onclick="applyFilterTemplate(${index})">
+            <button class="template-card" type="button" onclick="applyFilterTemplate(${index})" ${currentFilterLocked ? 'disabled' : ''}>
                 <span class="template-title">${escapeHtml(template.name)}</span>
                 <span class="template-meta">${typeName} / ${modeName} / ${template.patterns.length} 条</span>
             </button>
@@ -543,6 +544,7 @@ function displayFilterType(type) {
 }
 
 function applyFilterTemplate(index) {
+    if (currentFilterLocked) return;
     const template = filterTemplates[index];
     if (!template) return;
 
@@ -554,15 +556,26 @@ function applyFilterTemplate(index) {
 }
 
 function openFilterModal(data = null) {
+    currentFilterLocked = defaultSenderFilterIDs.has(data?.id || '');
     renderFilterTemplates();
-    document.getElementById('filter-modal-title').textContent = data ? '编辑过滤规则' : '添加过滤规则';
+    document.getElementById('filter-modal-title').textContent = currentFilterLocked ? '查看过滤规则' : (data ? '编辑过滤规则' : '添加过滤规则');
     document.getElementById('filter-id').value = data?.id || '';
     document.getElementById('filter-name').value = data?.name || '';
     document.getElementById('filter-type').value = data?.type || 'sender';
     document.getElementById('filter-mode').value = data?.mode || 'blacklist';
     document.getElementById('filter-patterns').value = (data?.patterns || []).join('\n');
     document.getElementById('filter-enabled').checked = data?.enabled !== false;
+    setFilterFormLocked(currentFilterLocked);
     document.getElementById('filter-modal').classList.add('active');
+}
+
+function setFilterFormLocked(locked) {
+    ['filter-name', 'filter-type', 'filter-mode', 'filter-patterns', 'filter-enabled'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.disabled = locked;
+    });
+    const saveButton = document.getElementById('filter-save-btn');
+    if (saveButton) saveButton.disabled = locked;
 }
 
 function editFilter(id) {
@@ -571,6 +584,7 @@ function editFilter(id) {
 }
 
 async function saveFilter() {
+    if (currentFilterLocked) return;
     const id = document.getElementById('filter-id').value;
     const data = {
         id: id || undefined,
