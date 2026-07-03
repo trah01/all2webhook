@@ -86,6 +86,11 @@ func lockDefaultSenderFilterRule(rule FilterRule) FilterRule {
 	return normalizeFilterRule(rule)
 }
 
+func updateDefaultSenderFilterPatterns(existing FilterRule, incoming FilterRule) FilterRule {
+	existing.Patterns = incoming.Patterns
+	return lockDefaultSenderFilterRule(existing)
+}
+
 func ensureDefaultSenderFilterRulesNoLock() {
 	ensureDefaultFilterRuleNoLock(FilterRule{
 		ID:       DefaultSenderBlacklistID,

@@ -253,6 +253,16 @@ func sendToEmailNotification(recipient string, accounts map[string]EmailAccount,
 	return sendSMTPMail(account, []string{recipient}, messageSubject, messageBody)
 }
 
+func sendToSMTPAccountNotification(account EmailAccount, subject, from, date, body string) error {
+	account = normalizeEmailAccount(account)
+	if account.Type != "smtp" || !account.Enabled {
+		return fmt.Errorf("SMTP 发信账号不可用")
+	}
+	messageSubject := "[All2Webhook] " + subject
+	messageBody := fmt.Sprintf("主题：%s\n发送人：%s\n时间：%s\n\n%s", subject, from, date, body)
+	return sendSMTPMail(account, []string{account.EmailUser}, messageSubject, messageBody)
+}
+
 func testSMTPAccount(account EmailAccount) error {
 	account = normalizeEmailAccount(account)
 	if account.Type != "smtp" {

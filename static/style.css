@@ -600,7 +600,7 @@ textarea.form-input {
     right: 0;
     z-index: 260;
     display: none;
-    max-height: 260px;
+    max-height: 340px;
     overflow-y: auto;
     padding: 6px;
     border: 1px solid var(--card-border);
@@ -797,6 +797,41 @@ textarea.form-input {
     justify-content: flex-end;
     gap: 12px;
     background: var(--bg-secondary);
+}
+
+.drawer-overlay {
+    justify-content: flex-end;
+    align-items: stretch;
+    padding: 0;
+}
+
+.drawer-overlay.active {
+    animation: fadeIn 0.16s ease;
+}
+
+.drawer-panel {
+    width: 33.333vw;
+    min-width: 420px;
+    max-width: 620px;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: var(--shadow-lg);
+    animation: drawerIn 0.2s ease;
+}
+
+.drawer-panel .modal-body {
+    flex: 1;
+}
+
+@keyframes drawerIn {
+    from {
+        transform: translateX(100%);
+    }
+
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* ===================== App Dialog ===================== */
@@ -1191,5 +1226,10 @@ textarea.form-input {
     .history-actions {
         flex-wrap: wrap;
         justify-content: flex-start;
+    }
+
+    .drawer-panel {
+        width: 100vw;
+        min-width: 0;
     }
 }

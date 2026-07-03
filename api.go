@@ -33,6 +33,10 @@ func setupAPI(r *gin.Engine) {
 			contentType = "text/css; charset=utf-8"
 		} else if strings.HasSuffix(name, ".js") {
 			contentType = "application/javascript; charset=utf-8"
+		} else if strings.HasSuffix(name, ".svg") {
+			contentType = "image/svg+xml"
+		} else if strings.HasSuffix(name, ".png") {
+			contentType = "image/png"
 		}
 		c.Data(http.StatusOK, contentType, data)
 	})
@@ -391,7 +395,7 @@ func setupAPI(r *gin.Engine) {
 			if f.ID == id {
 				found = true
 				if isDefaultSenderFilterID(id) {
-					config.FilterRules[i] = lockDefaultSenderFilterRule(f)
+					config.FilterRules[i] = updateDefaultSenderFilterPatterns(f, filter)
 					savedFilter = config.FilterRules[i]
 					break
 				}

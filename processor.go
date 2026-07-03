@@ -99,6 +99,24 @@ func processPendingMessages() {
 			sentTargets := make([]string, 0, len(targetIDs))
 			failedTargets := make([]string, 0)
 			for _, targetID := range targetIDs {
+				if strings.HasPrefix(targetID, "smtp:") {
+					accountID := strings.TrimPrefix(targetID, "smtp:")
+					account, ok := accounts[accountID]
+					if !ok {
+						failedTargets = append(failedTargets, fmt.Sprintf("%s: SMTP 发信账号不存在", targetID))
+						continue
+					}
+					sendErr = sendToSMTPAccountNotification(account, subjectForSend, senderForSend, dateStr, displayBody)
+					if sendErr != nil {
+						failedTargets = append(failedTargets, fmt.Sprintf("%s: %v", firstNonEmpty(account.Name, account.EmailUser, accountID), sendErr))
+						addLog(fmt.Sprintf("发送失败 [%s -> %s]: %v", subjectForSend, firstNonEmpty(account.Name, account.EmailUser, accountID), sendErr), "error")
+						continue
+					}
+					sentTargets = append(sentTargets, firstNonEmpty(account.Name, account.EmailUser, accountID))
+					addLog(fmt.Sprintf("转发成功 [%s -> %s]", subjectForSend, firstNonEmpty(account.Name, account.EmailUser, accountID)), "success")
+					continue
+				}
+
 				webhook, ok := webhooks[targetID]
 				if !ok || !webhook.Enabled {
 					continue

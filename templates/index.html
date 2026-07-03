@@ -563,15 +563,15 @@
             <div class="modal-body">
                 <form id="filter-form">
                     <input type="hidden" id="filter-id">
-                    <div class="form-group">
+                    <div class="form-group" data-filter-advanced>
                         <label class="form-label">规则模板</label>
                         <div class="template-grid" id="filter-template-list"></div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" data-filter-advanced>
                         <label class="form-label">规则名称</label>
                         <input type="text" class="form-input" id="filter-name" placeholder="例如：屏蔽营销邮件">
                     </div>
-                    <div class="form-row">
+                    <div class="form-row" data-filter-advanced>
                         <div class="form-group">
                             <label class="form-label">过滤对象</label>
                             <select class="form-input" id="filter-type">
@@ -590,12 +590,12 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">匹配内容 (每行一条，支持邮箱、域名、项目名、关键词)</label>
+                        <label class="form-label" id="filter-patterns-label">匹配内容 (每行一条，支持邮箱、域名、项目名、关键词)</label>
                         <textarea class="form-input" id="filter-patterns" rows="5" placeholder="newsletter@example.com
 unsubscribe
 退订"></textarea>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" data-filter-advanced>
                         <label class="form-checkbox">
                             <input type="checkbox" id="filter-enabled" checked>
                             <span>启用此过滤规则</span>
@@ -611,8 +611,8 @@ unsubscribe
     </div>
 
     <!-- Rule Modal -->
-    <div id="rule-modal" class="modal-overlay">
-        <div class="modal">
+    <div id="rule-modal" class="modal-overlay drawer-overlay">
+        <div class="modal drawer-panel">
             <div class="modal-header">
                 <h3 class="modal-title" id="rule-modal-title">添加转发规则</h3>
                 <button class="modal-close" onclick="closeModal('rule-modal')">
