@@ -13,6 +13,12 @@ async function loadInboundProjectsForRules() {
 
 async function loadRules() {
     try {
+        if (!accounts.length) {
+            await loadAccounts();
+        }
+        if (!webhooks.length) {
+            await loadWebhooks();
+        }
         if (!filterRules.length) {
             filterRules = await api('GET', '/api/filters');
             if (!filterRules || !Array.isArray(filterRules)) filterRules = [];
@@ -42,7 +48,7 @@ function renderRules() {
     }
 
     tbody.innerHTML = rules.map(rule => {
-        const sourceName = displayRuleSource(rule.source_account);
+        const sourceNames = normalizeRuleSources(rule).map(displayRuleSource);
         const targetIDs = normalizeRuleTargets(rule);
         const targetNames = targetIDs
             .map(id => webhooks.find(w => w.id === id)?.name)
@@ -53,7 +59,7 @@ function renderRules() {
         return `
             <tr>
                 <td><strong>${escapeHtml(rule.name)}</strong></td>
-                <td>${escapeHtml(sourceName)}</td>
+                <td>${sourceNames.map(name => `<span class="tag tag-info">${escapeHtml(name)}</span>`).join(' ')}</td>
                 <td>${targetNames.length ? targetNames.map(name => `<span class="tag tag-info">${escapeHtml(name)}</span>`).join(' ') : '未知'}</td>
                 <td>
                     ${selectedFilters.length ? selectedFilters.map(f => `<span class="tag tag-info">${escapeHtml(f.name)}</span>`).join(' ') : '无'}
@@ -92,6 +98,20 @@ function normalizeRuleTargets(rule) {
     return result;
 }
 
+function normalizeRuleSources(rule) {
+    const result = [];
+    const seen = new Set();
+    [rule.source_account, ...(rule.source_accounts || [])].forEach(id => {
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        result.push(id);
+    });
+    if (result.length === 0 || result.includes('all')) {
+        return ['all'];
+    }
+    return result;
+}
+
 function displayWebhookType(type) {
     const names = {
         feishu: '飞书',
@@ -99,7 +119,8 @@ function displayWebhookType(type) {
         wecom: '企业微信',
         slack: 'Slack',
         discord: 'Discord',
-        custom: '自定义'
+        custom: '自定义',
+        email: '邮件通知'
     };
     return names[type] || type || '未知类型';
 }
@@ -109,25 +130,91 @@ async function openRuleModal(data = null) {
         await loadInboundProjectsForRules();
     }
 
-    const sourceSelect = document.getElementById('rule-source');
-    sourceSelect.innerHTML = `
-        <option value="all">所有来源</option>
-        <optgroup label="邮箱账号">
-            ${accounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}
-        </optgroup>
-        <optgroup label="接收项目">
-            ${inboundProjects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
-        </optgroup>
-    `;
-
     document.getElementById('rule-modal-title').textContent = data ? '编辑转发规则' : '添加转发规则';
     document.getElementById('rule-id').value = data?.id || '';
     document.getElementById('rule-name').value = data?.name || '';
-    document.getElementById('rule-source').value = data?.source_account || 'all';
+    renderRuleSourceDropdown(normalizeRuleSources(data || { source_account: 'all' }));
     renderRuleTargetDropdown(normalizeRuleTargets(data || {}));
     renderRuleFilterDropdown(data?.filter_rule_ids || []);
     document.getElementById('rule-enabled').checked = data?.enabled !== false;
     document.getElementById('rule-modal').classList.add('active');
+}
+
+function renderRuleSourceDropdown(selectedIDs = ['all']) {
+    const menu = document.getElementById('rule-source-menu');
+    if (!menu) return;
+    const selectedSet = new Set(selectedIDs.length ? selectedIDs : ['all']);
+    const imapAccounts = accounts.filter(account => (account.type || 'imap') === 'imap');
+    const accountOptions = imapAccounts.map(account => `
+        <label class="filter-option">
+            <input type="checkbox" class="rule-source-checkbox" value="${escapeHtml(account.id)}"
+                ${selectedSet.has(account.id) ? 'checked' : ''} onchange="updateRuleSourceSummary(this)">
+            <span class="filter-option-main">
+                <span class="filter-option-title">${escapeHtml(account.name || account.email_user || '邮箱账号')}</span>
+                <span class="filter-option-meta">IMAP 收件 / ${account.enabled ? '已启用' : '已禁用'}</span>
+            </span>
+        </label>
+    `).join('');
+    const projectOptions = inboundProjects.map(project => `
+        <label class="filter-option">
+            <input type="checkbox" class="rule-source-checkbox" value="${escapeHtml(project.id)}"
+                ${selectedSet.has(project.id) ? 'checked' : ''} onchange="updateRuleSourceSummary(this)">
+            <span class="filter-option-main">
+                <span class="filter-option-title">${escapeHtml(project.name || '接收项目')}</span>
+                <span class="filter-option-meta">接收项目 / ${project.enabled ? '已启用' : '已禁用'}</span>
+            </span>
+        </label>
+    `).join('');
+
+    menu.innerHTML = `
+        <label class="filter-option">
+            <input type="checkbox" class="rule-source-checkbox" value="all"
+                ${selectedSet.has('all') ? 'checked' : ''} onchange="updateRuleSourceSummary(this)">
+            <span class="filter-option-main">
+                <span class="filter-option-title">所有来源</span>
+                <span class="filter-option-meta">匹配所有 IMAP 收件账号和接收项目</span>
+            </span>
+        </label>
+        ${accountOptions}
+        ${projectOptions}
+    `;
+    updateRuleSourceSummary();
+}
+
+function toggleRuleSourceDropdown(event) {
+    event.stopPropagation();
+    document.getElementById('rule-source-dropdown').classList.toggle('open');
+}
+
+function getSelectedRuleSourceIDs() {
+    return Array.from(document.querySelectorAll('.rule-source-checkbox:checked'))
+        .map(input => input.value);
+}
+
+function updateRuleSourceSummary(changedInput = null) {
+    const allInput = document.querySelector('.rule-source-checkbox[value="all"]');
+    if (changedInput?.value === 'all' && changedInput.checked) {
+        document.querySelectorAll('.rule-source-checkbox').forEach(input => {
+            if (input.value !== 'all') input.checked = false;
+        });
+    } else if (changedInput?.value !== 'all' && changedInput?.checked && allInput) {
+        allInput.checked = false;
+    }
+    const specificSelected = Array.from(document.querySelectorAll('.rule-source-checkbox:checked'))
+        .filter(input => input.value !== 'all');
+    if (specificSelected.length === 0 && allInput) {
+        allInput.checked = true;
+    }
+
+    const summary = document.getElementById('rule-source-summary');
+    if (!summary) return;
+    const selectedIDs = getSelectedRuleSourceIDs();
+    if (selectedIDs.includes('all')) {
+        summary.textContent = '所有来源';
+        return;
+    }
+    const names = selectedIDs.map(displayRuleSource).filter(Boolean);
+    summary.textContent = names.length <= 2 ? names.join('、') : `已选择 ${names.length} 个来源`;
 }
 
 function renderRuleTargetDropdown(selectedIDs = []) {
@@ -241,10 +328,12 @@ function editRule(id) {
 async function saveRule() {
     const id = document.getElementById('rule-id').value;
     const targetIDs = getSelectedRuleTargetIDs();
+    const sourceIDs = getSelectedRuleSourceIDs();
     const data = {
         id: id || undefined,
         name: document.getElementById('rule-name').value,
-        source_account: document.getElementById('rule-source').value,
+        source_account: sourceIDs[0] || 'all',
+        source_accounts: sourceIDs,
         target_webhook: targetIDs[0] || '',
         target_webhooks: targetIDs,
         filter_rule_ids: getSelectedRuleFilterIDs(),

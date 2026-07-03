@@ -23,10 +23,10 @@ func addLog(msg string, logType string) {
 
 	// 同时输出到控制台
 	prefix := map[string]string{
-		"info":    "ℹ️",
-		"success": "✅",
-		"error":   "❌",
-		"warning": "⚠️",
+		"info":    "[INFO]",
+		"success": "[OK]",
+		"error":   "[ERROR]",
+		"warning": "[WARN]",
 	}[logType]
 	log.Printf("%s %s", prefix, msg)
 }

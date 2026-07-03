@@ -126,6 +126,33 @@ body {
     color: var(--text-secondary);
 }
 
+.nav-link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.nav-link-button:hover {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+    border-color: var(--divider);
+}
+
+.nav-link-button svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+}
+
 .status-dot {
     width: 8px;
     height: 8px;
@@ -191,6 +218,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .card-title {
@@ -198,6 +227,19 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.01em;
+}
+
+.card-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.compact-select {
+    width: auto;
+    min-width: 116px;
 }
 
 .card-body {

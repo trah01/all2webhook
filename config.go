@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"strings"
 )
 
 // ===================== 配置管理 =====================
@@ -26,8 +27,29 @@ func loadConfig() {
 		return
 	}
 	ensureDefaultSenderFilterRulesNoLock()
+	normalizeEmailAccountsNoLock()
 	normalizeForwardRulesNoLock()
 	saveConfigNoLock()
+}
+
+func normalizeEmailAccountsNoLock() {
+	for i := range config.Accounts {
+		config.Accounts[i] = normalizeEmailAccount(config.Accounts[i])
+	}
+}
+
+func normalizeEmailAccount(account EmailAccount) EmailAccount {
+	account.Type = strings.ToLower(strings.TrimSpace(account.Type))
+	if account.Type != "smtp" {
+		account.Type = "imap"
+	}
+	account.ImapServer = strings.TrimSpace(account.ImapServer)
+	account.SmtpServer = strings.TrimSpace(account.SmtpServer)
+	account.EmailUser = strings.TrimSpace(account.EmailUser)
+	if account.Type == "imap" && account.Folders == nil {
+		account.Folders = []string{"INBOX"}
+	}
+	return account
 }
 
 func normalizeForwardRulesNoLock() {
@@ -37,6 +59,29 @@ func normalizeForwardRulesNoLock() {
 }
 
 func normalizeForwardRule(rule ForwardRule) ForwardRule {
+	sources := make([]string, 0, len(rule.SourceAccounts)+1)
+	seenSources := make(map[string]bool)
+	if rule.SourceAccount != "" {
+		sources = append(sources, rule.SourceAccount)
+		seenSources[rule.SourceAccount] = true
+	}
+	for _, source := range rule.SourceAccounts {
+		source = strings.TrimSpace(source)
+		if source == "" || seenSources[source] {
+			continue
+		}
+		sources = append(sources, source)
+		seenSources[source] = true
+	}
+	if len(sources) == 0 {
+		sources = append(sources, "all")
+	}
+	if seenSources["all"] {
+		sources = []string{"all"}
+	}
+	rule.SourceAccount = sources[0]
+	rule.SourceAccounts = sources
+
 	targets := make([]string, 0, len(rule.TargetWebhooks)+1)
 	seen := make(map[string]bool)
 	if rule.TargetWebhook != "" {

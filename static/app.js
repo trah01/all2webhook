@@ -72,7 +72,8 @@ async function loadStats() {
 
 async function loadLogs() {
     try {
-        logs = await api('GET', '/api/logs');
+        const limit = document.getElementById('log-limit')?.value || '50';
+        logs = await api('GET', `/api/logs?limit=${encodeURIComponent(limit)}`);
         if (!logs || !Array.isArray(logs)) logs = [];
         renderLogs();
     } catch (e) {
@@ -118,9 +119,15 @@ function renderLogs() {
     `).join('');
 }
 
-function clearLogs() {
-    logs = [];
-    renderLogs();
+async function clearLogs() {
+    try {
+        await api('DELETE', '/api/logs');
+        logs = [];
+        renderLogs();
+        await showAppAlert('实时日志已清空', { type: 'success', title: '已清空' });
+    } catch (e) {
+        await showAppAlert('清空日志失败: ' + e.message, { type: 'error', title: '清空失败' });
+    }
 }
 
 // ===================== Accounts =====================
@@ -151,7 +158,9 @@ function renderAccounts() {
 
     tbody.innerHTML = accounts.map(acc => {
         const checkTime = lastChecks[acc.id];
-        const checkDisplay = checkTime ? checkTime.split(' ')[1] : '尚未检查';
+        const accountType = acc.type === 'smtp' ? 'smtp' : 'imap';
+        const checkDisplay = accountType === 'smtp' ? '用于发送通知' : (checkTime ? checkTime.split(' ')[1] : '尚未检查');
+        const serverDisplay = accountType === 'smtp' ? acc.smtp_server : acc.imap_server;
         return `
         <tr>
             <td>
@@ -162,7 +171,10 @@ function renderAccounts() {
                 </div>
             </td>
             <td>${escapeHtml(acc.email_user)}</td>
-            <td>${escapeHtml(acc.imap_server)}</td>
+            <td>
+                ${escapeHtml(serverDisplay || '-')}
+                <div class="muted-line">${accountType === 'smtp' ? 'SMTP 发信' : 'IMAP 收件'}</div>
+            </td>
             <td>
                 <span class="tag ${acc.enabled ? 'tag-success' : 'tag-neutral'}">
                     ${acc.enabled ? '已启用' : '已禁用'}
@@ -183,6 +195,7 @@ function openAccountModal(data = null) {
     document.getElementById('account-modal-title').textContent = data ? '编辑邮箱账号' : '添加邮箱账号';
     document.getElementById('account-id').value = data?.id || '';
     document.getElementById('account-name').value = data?.name || '';
+    document.getElementById('account-type').value = data?.type === 'smtp' ? 'smtp' : 'imap';
     document.getElementById('account-email').value = data?.email_user || '';
     // 解析IMAP服务器地址
     const imapServer = data?.imap_server || '';
@@ -194,11 +207,31 @@ function openAccountModal(data = null) {
         document.getElementById('account-imap-host').value = imapServer;
         document.getElementById('account-imap-port').value = '993';
     }
+    const smtpServer = data?.smtp_server || '';
+    if (smtpServer.includes(':')) {
+        const [host, port] = smtpServer.split(':');
+        document.getElementById('account-smtp-host').value = host;
+        document.getElementById('account-smtp-port').value = port;
+    } else {
+        document.getElementById('account-smtp-host').value = smtpServer;
+        document.getElementById('account-smtp-port').value = '587';
+    }
     document.getElementById('account-pass').value = data?.email_pass || '';
     document.getElementById('account-interval').value = data?.check_interval || 60;
     document.getElementById('account-folders').value = (data?.folders || ['INBOX']).join(', ');
     document.getElementById('account-enabled').checked = data?.enabled !== false;
+    updateAccountTypeFields();
     document.getElementById('account-modal').classList.add('active');
+}
+
+function updateAccountTypeFields() {
+    const type = document.getElementById('account-type')?.value || 'imap';
+    document.querySelectorAll('.account-imap-fields').forEach(el => {
+        el.style.display = type === 'imap' ? '' : 'none';
+    });
+    document.querySelectorAll('.account-smtp-fields').forEach(el => {
+        el.style.display = type === 'smtp' ? '' : 'none';
+    });
 }
 
 function editAccount(id) {
@@ -215,14 +248,19 @@ function getAccountFormData() {
 
     const imapHost = document.getElementById('account-imap-host').value.trim();
     const imapPort = document.getElementById('account-imap-port').value || '993';
+    const smtpHost = document.getElementById('account-smtp-host').value.trim();
+    const smtpPort = document.getElementById('account-smtp-port').value || '587';
+    const type = document.getElementById('account-type').value;
     const data = {
         id: id || undefined,
         name: document.getElementById('account-name').value,
+        type,
         email_user: document.getElementById('account-email').value,
-        imap_server: imapHost + ':' + imapPort,
+        imap_server: type === 'imap' && imapHost ? imapHost + ':' + imapPort : '',
+        smtp_server: type === 'smtp' && smtpHost ? smtpHost + ':' + smtpPort : '',
         email_pass: document.getElementById('account-pass').value,
-        check_interval: parseInt(document.getElementById('account-interval').value) || 60,
-        folders: foldersList.length > 0 ? foldersList : ['INBOX'],
+        check_interval: type === 'imap' ? (parseInt(document.getElementById('account-interval').value) || 60) : 60,
+        folders: type === 'imap' ? (foldersList.length > 0 ? foldersList : ['INBOX']) : [],
         enabled: document.getElementById('account-enabled').checked
     };
     return data;
@@ -247,6 +285,10 @@ async function saveAccount() {
 }
 
 async function testAccountFolders() {
+    if (document.getElementById('account-type').value !== 'imap') {
+        await showAppAlert('SMTP 账号不需要获取 IMAP 文件夹', { type: 'info', title: '无需操作' });
+        return;
+    }
     const btn = document.getElementById('btn-test-folders');
     const originalText = btn.textContent;
     btn.textContent = '获取中...';
@@ -315,11 +357,11 @@ async function testAccountFolders() {
 async function testAccountConnectionModal() {
     try {
         const data = getAccountFormData();
-        const res = await api('POST', '/api/test-imap', data);
+        const res = await api('POST', data.type === 'smtp' ? '/api/test-smtp' : '/api/test-imap', data);
         if (res.error) {
             await showAppAlert('连接测试失败: ' + res.error, { type: 'error', title: '连接失败' });
         } else {
-            await showAppAlert('当前配置连接测试成功', { type: 'success', title: '连接成功' });
+            await showAppAlert(data.type === 'smtp' ? 'SMTP 发信测试成功' : '当前配置连接测试成功', { type: 'success', title: '连接成功' });
         }
     } catch (e) {
         await showAppAlert('网络异常: ' + e.message, { type: 'error', title: '请求失败' });
@@ -330,11 +372,12 @@ async function testAccountConnectionInList(id) {
     const acc = accounts.find(a => a.id === id);
     if (!acc) return;
     try {
-        const res = await api('POST', '/api/test-imap', acc);
+        const type = acc.type === 'smtp' ? 'smtp' : 'imap';
+        const res = await api('POST', type === 'smtp' ? '/api/test-smtp' : '/api/test-imap', acc);
         if (res.error) {
             await showAppAlert('连接测试失败: ' + res.error, { type: 'error', title: '连接失败' });
         } else {
-            await showAppAlert('账号连接测试成功', { type: 'success', title: '连接成功' });
+            await showAppAlert(type === 'smtp' ? 'SMTP 发信测试成功' : '账号连接测试成功', { type: 'success', title: '连接成功' });
         }
     } catch (e) {
         await showAppAlert('网络异常: ' + e.message, { type: 'error', title: '请求失败' });
@@ -384,7 +427,8 @@ function renderWebhooks() {
         wecom: '企业微信',
         slack: 'Slack',
         discord: 'Discord',
-        custom: '自定义'
+        custom: '自定义',
+        email: '邮件通知'
     };
 
     tbody.innerHTML = webhooks.map(wh => `
@@ -415,7 +459,22 @@ function openWebhookModal(data = null) {
     document.getElementById('webhook-type').value = data?.type || 'feishu';
     document.getElementById('webhook-url').value = data?.url || '';
     document.getElementById('webhook-enabled').checked = data?.enabled !== false;
+    updateWebhookTargetFields();
     document.getElementById('webhook-modal').classList.add('active');
+}
+
+function updateWebhookTargetFields() {
+    const type = document.getElementById('webhook-type')?.value || 'feishu';
+    const label = document.getElementById('webhook-url-label');
+    const input = document.getElementById('webhook-url');
+    if (!label || !input) return;
+    if (type === 'email') {
+        label.textContent = '收件邮箱地址';
+        input.placeholder = 'notify@example.com';
+    } else {
+        label.textContent = 'Webhook URL';
+        input.placeholder = 'https://...';
+    }
 }
 
 function editWebhook(id) {
@@ -650,7 +709,8 @@ async function addSenderToDefaultFilter(sender, mode) {
 async function loadHistory() {
     try {
         const status = document.getElementById('history-filter').value;
-        const messages = await api('GET', `/api/messages?status=${status}`);
+        const limit = document.getElementById('history-limit')?.value || '50';
+        const messages = await api('GET', `/api/messages?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}`);
         renderHistory(messages || []);
     } catch (e) {
         console.error('Failed to load history:', e);
@@ -712,6 +772,19 @@ function renderHistory(messages) {
             </div>
         </div>
     `).join('');
+}
+
+async function clearHistory() {
+    try {
+        const status = document.getElementById('history-filter').value;
+        const result = await api('DELETE', `/api/messages?status=${encodeURIComponent(status)}`);
+        await loadHistory();
+        loadStats();
+        const scope = status ? '当前状态的历史记录' : '全部历史记录';
+        await showAppAlert(`${scope}已清空，共删除 ${result.deleted || 0} 条`, { type: 'success', title: '已清空' });
+    } catch (e) {
+        await showAppAlert('清空历史记录失败: ' + e.message, { type: 'error', title: '清空失败' });
+    }
 }
 
 // ===================== Utilities =====================
@@ -846,6 +919,8 @@ function showAppConfirm(message, options = {}) {
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+    document.getElementById('rule-source-dropdown')?.classList.remove('open');
+    document.getElementById('rule-target-dropdown')?.classList.remove('open');
     document.getElementById('rule-filter-dropdown')?.classList.remove('open');
 }
 
@@ -882,8 +957,13 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 });
 
 document.addEventListener('click', () => {
+    document.getElementById('rule-source-dropdown')?.classList.remove('open');
     document.getElementById('rule-filter-dropdown')?.classList.remove('open');
     document.getElementById('rule-target-dropdown')?.classList.remove('open');
+});
+
+document.getElementById('rule-source-dropdown')?.addEventListener('click', event => {
+    event.stopPropagation();
 });
 
 document.getElementById('rule-filter-dropdown')?.addEventListener('click', event => {

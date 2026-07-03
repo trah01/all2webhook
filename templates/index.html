@@ -30,6 +30,14 @@
             </div>
 
             <div class="nav-status">
+                <a class="nav-link-button" href="https://github.com/trah01/all2webhook" target="_blank"
+                    rel="noopener noreferrer" aria-label="打开 GitHub 仓库 trah01/all2webhook">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path
+                            d="M12 2C6.48 2 2 6.58 2 12.24c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.71 0 0 .84-.28 2.75 1.05A9.32 9.32 0 0 1 12 5.95c.85 0 1.7.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.8 0 .27.18.59.69.49A10.1 10.1 0 0 0 22 12.24C22 6.58 17.52 2 12 2z" />
+                    </svg>
+                    GitHub
+                </a>
                 <span class="status-dot"></span>
                 <span>运行中</span>
             </div>
@@ -106,15 +114,23 @@
                             系统监测中
                         </span>
                     </div>
-                    <button class="btn btn-secondary btn-sm" onclick="clearLogs()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
-                            </path>
-                        </svg>
-                        清空日志
-                    </button>
+                    <div class="card-header-actions">
+                        <select class="form-input compact-select" id="log-limit" onchange="loadLogs()">
+                            <option value="20">最近 20 条</option>
+                            <option value="50" selected>最近 50 条</option>
+                            <option value="100">最近 100 条</option>
+                            <option value="200">最近 200 条</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" onclick="clearLogs()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                </path>
+                            </svg>
+                            清空日志
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="logs" class="log-list">
@@ -155,7 +171,7 @@
                                 <tr>
                                     <th>名称</th>
                                     <th>邮箱地址</th>
-                                    <th>IMAP 服务器</th>
+                                    <th>服务器/用途</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>
@@ -311,14 +327,29 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">转发历史记录</h2>
-                    <div style="display: flex; gap: 8px;">
-                        <select class="form-input" style="width: auto;" id="history-filter" onchange="loadHistory()">
+                    <div class="card-header-actions">
+                        <select class="form-input compact-select" id="history-filter" onchange="loadHistory()">
                             <option value="">全部状态</option>
                             <option value="pending">待发送</option>
                             <option value="sent">已发送</option>
                             <option value="failed">发送失败</option>
                             <option value="filtered">已过滤</option>
                         </select>
+                        <select class="form-input compact-select" id="history-limit" onchange="loadHistory()">
+                            <option value="20">最近 20 条</option>
+                            <option value="50" selected>最近 50 条</option>
+                            <option value="100">最近 100 条</option>
+                            <option value="200">最近 200 条</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" onclick="clearHistory()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                </path>
+                            </svg>
+                            清空记录
+                        </button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -351,11 +382,24 @@
                             <input type="text" class="form-input" id="account-name" placeholder="例如：工作邮箱">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">邮箱地址</label>
-                            <input type="email" class="form-input" id="account-email" placeholder="user@example.com">
+                            <label class="form-label">账号类型</label>
+                            <select class="form-input" id="account-type" onchange="updateAccountTypeFields()">
+                                <option value="imap">IMAP 收件账号</option>
+                                <option value="smtp">SMTP 发信账号（用于发送通知）</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">邮箱地址</label>
+                            <input type="email" class="form-input" id="account-email" placeholder="user@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">密码/授权码</label>
+                            <input type="password" class="form-input" id="account-pass" placeholder="邮箱密码或授权码">
+                        </div>
+                    </div>
+                    <div class="form-row account-imap-fields">
                         <div class="form-group">
                             <label class="form-label">IMAP 服务器</label>
                             <input type="text" class="form-input" id="account-imap-host" placeholder="imap.example.com">
@@ -366,17 +410,24 @@
                                 max="65535">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">密码/授权码</label>
-                        <input type="password" class="form-input" id="account-pass" placeholder="邮箱密码或授权码">
+                    <div class="form-row account-smtp-fields" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label">SMTP 服务器</label>
+                            <input type="text" class="form-input" id="account-smtp-host" placeholder="smtp.example.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">端口</label>
+                            <input type="number" class="form-input" id="account-smtp-port" value="587" min="1"
+                                max="65535">
+                        </div>
                     </div>
-                    <div class="form-row">
+                    <div class="form-row account-imap-fields">
                         <div class="form-group">
                             <label class="form-label">检查间隔 (秒)</label>
                             <input type="number" class="form-input" id="account-interval" value="60" min="15">
                         </div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group account-imap-fields">
                         <label class="form-label"
                             style="display: flex; justify-content: space-between; align-items: center;">
                             <span>监听文件夹 (逗号分隔，默认 INBOX)</span>
@@ -466,19 +517,20 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">类型</label>
-                            <select class="form-input" id="webhook-type">
+                            <select class="form-input" id="webhook-type" onchange="updateWebhookTargetFields()">
                                 <option value="feishu">飞书</option>
                                 <option value="dingtalk">钉钉</option>
                                 <option value="wecom">企业微信</option>
                                 <option value="slack">Slack</option>
                                 <option value="discord">Discord</option>
                                 <option value="custom">自定义</option>
+                                <option value="email">邮件通知</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Webhook URL</label>
-                        <input type="url" class="form-input" id="webhook-url" placeholder="https://...">
+                        <label class="form-label" id="webhook-url-label">Webhook URL</label>
+                        <input type="text" class="form-input" id="webhook-url" placeholder="https://...">
                     </div>
                     <div class="form-group">
                         <label class="form-checkbox">
@@ -581,9 +633,17 @@ unsubscribe
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">来源</label>
-                            <select class="form-input" id="rule-source">
-                                <option value="all">所有来源</option>
-                            </select>
+                            <div class="filter-dropdown" id="rule-source-dropdown">
+                                <button class="filter-dropdown-trigger" type="button"
+                                    onclick="toggleRuleSourceDropdown(event)">
+                                    <span id="rule-source-summary">所有来源</span>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                                <div class="filter-dropdown-menu" id="rule-source-menu"></div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">目标渠道</label>

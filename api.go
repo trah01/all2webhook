@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ func setupAPI(r *gin.Engine) {
 		defer configLock.RUnlock()
 		safeAccounts := make([]EmailAccount, len(config.Accounts))
 		for i, acc := range config.Accounts {
-			safeAccounts[i] = acc
+			safeAccounts[i] = normalizeEmailAccount(acc)
 			if safeAccounts[i].EmailPass != "" {
 				safeAccounts[i].EmailPass = "********"
 			}
@@ -69,6 +70,7 @@ func setupAPI(r *gin.Engine) {
 		if account.EmailPass == "********" {
 			account.EmailPass = ""
 		}
+		account = normalizeEmailAccount(account)
 		config.Accounts = append(config.Accounts, account)
 		saveConfigNoLock()
 		configLock.Unlock()
@@ -93,6 +95,12 @@ func setupAPI(r *gin.Engine) {
 				}
 			}
 			configLock.RUnlock()
+		}
+
+		account = normalizeEmailAccount(account)
+		if account.Type != "imap" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "账号类型不是 IMAP"})
+			return
 		}
 
 		imapServer := account.ImapServer
@@ -133,6 +141,32 @@ func setupAPI(r *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"folders": folders})
 	})
 
+	r.POST("/api/test-smtp", func(c *gin.Context) {
+		var account EmailAccount
+		if err := c.ShouldBindJSON(&account); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if account.EmailPass == "********" && account.ID != "" {
+			configLock.RLock()
+			for _, acc := range config.Accounts {
+				if acc.ID == account.ID {
+					account.EmailPass = acc.EmailPass
+					break
+				}
+			}
+			configLock.RUnlock()
+		}
+
+		account = normalizeEmailAccount(account)
+		if err := testSMTPAccount(account); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("SMTP 连接测试失败: %v", err)})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
 	r.PUT("/api/accounts/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		var account EmailAccount
@@ -148,6 +182,7 @@ func setupAPI(r *gin.Engine) {
 				if account.EmailPass == "********" {
 					account.EmailPass = acc.EmailPass
 				}
+				account = normalizeEmailAccount(account)
 				config.Accounts[i] = account
 				break
 			}
@@ -179,7 +214,7 @@ func setupAPI(r *gin.Engine) {
 		safeWebhooks := make([]WebhookTarget, len(config.Webhooks))
 		for i, wh := range config.Webhooks {
 			safeWebhooks[i] = wh
-			if wh.URL != "" {
+			if wh.Type != "email" && wh.URL != "" {
 				l := len(wh.URL)
 				if l > 35 {
 					safeWebhooks[i].URL = wh.URL[:30] + "...********..." + wh.URL[l-5:]
@@ -481,14 +516,25 @@ func setupAPI(r *gin.Engine) {
 
 	// ===== 消息与日志 =====
 	r.GET("/api/logs", func(c *gin.Context) {
+		limit := clampQueryInt(c, "limit", 50, 1, 200)
 		logsMutex.Lock()
 		defer logsMutex.Unlock()
-		c.JSON(http.StatusOK, logs)
+		if limit > len(logs) {
+			limit = len(logs)
+		}
+		c.JSON(http.StatusOK, logs[:limit])
+	})
+
+	r.DELETE("/api/logs", func(c *gin.Context) {
+		logsMutex.Lock()
+		logs = []LogEntry{}
+		logsMutex.Unlock()
+		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
 	r.GET("/api/messages", func(c *gin.Context) {
 		status := c.Query("status")
-		limit := 50
+		limit := clampQueryInt(c, "limit", 50, 1, 200)
 		offset := 0
 		messages, err := getMessages(status, limit, offset)
 		if err != nil {
@@ -503,6 +549,16 @@ func setupAPI(r *gin.Engine) {
 		}
 
 		c.JSON(http.StatusOK, messages)
+	})
+
+	r.DELETE("/api/messages", func(c *gin.Context) {
+		status := c.Query("status")
+		deleted, err := deleteMessages(status)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "deleted": deleted})
 	})
 
 	r.GET("/api/stats", func(c *gin.Context) {
@@ -583,12 +639,26 @@ func setupAPI(r *gin.Engine) {
 		switch webhook.Type {
 		case "feishu":
 			err = sendToFeishu(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
+		case "dingtalk":
+			err = sendToDingTalk(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
+		case "wecom":
+			err = sendToWeCom(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
 		case "slack":
 			err = sendToSlack(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
 		case "discord":
 			err = sendToDiscord(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
 		case "custom":
 			err = sendToCustomWebhook(webhook.URL, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
+		case "email":
+			accountMap := make(map[string]EmailAccount)
+			configLock.RLock()
+			for _, account := range config.Accounts {
+				accountMap[account.ID] = account
+			}
+			configLock.RUnlock()
+			err = sendToEmailNotification(webhook.URL, accountMap, "测试消息", "test@test.com", time.Now().Format("2006-01-02"), "这是一条测试消息")
+		default:
+			err = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
 		}
 
 		if err != nil {
@@ -597,4 +667,18 @@ func setupAPI(r *gin.Engine) {
 			c.JSON(http.StatusOK, gin.H{"success": true})
 		}
 	})
+}
+
+func clampQueryInt(c *gin.Context, key string, defaultValue int, minValue int, maxValue int) int {
+	value, err := strconv.Atoi(c.Query(key))
+	if err != nil {
+		return defaultValue
+	}
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }

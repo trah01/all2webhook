@@ -244,6 +244,26 @@ func deleteOldMessages(days int) error {
 	return err
 }
 
+func deleteMessages(status string) (int64, error) {
+	var (
+		result sql.Result
+		err    error
+	)
+	if strings.TrimSpace(status) != "" {
+		result, err = dbExec(`DELETE FROM messages WHERE status = ?`, status)
+	} else {
+		result, err = dbExec(`DELETE FROM messages`)
+	}
+	if err != nil {
+		return 0, err
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+	return deleted, nil
+}
+
 func listInboundProjects(publicBaseURL string) ([]InboundProject, error) {
 	rows, err := dbQuery(`SELECT id, name, secret, enabled, created_at, rotated_at FROM inbound_projects ORDER BY created_at DESC`)
 	if err != nil {

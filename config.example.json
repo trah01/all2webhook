@@ -3,7 +3,9 @@
     {
       "id": "acc_17700000000",
       "name": "example",
+      "type": "imap",
       "imap_server": "imap.qq.com:993",
+      "smtp_server": "",
       "email_user": "your_email@qq.com",
       "email_pass": "your_auth_code_here",
       "enabled": true,
@@ -11,6 +13,18 @@
       "folders": [
         "INBOX"
       ]
+    },
+    {
+      "id": "smtp_17700000000",
+      "name": "通知发信账号",
+      "type": "smtp",
+      "imap_server": "",
+      "smtp_server": "smtp.qq.com:587",
+      "email_user": "your_email@qq.com",
+      "email_pass": "your_auth_code_here",
+      "enabled": true,
+      "check_interval": 60,
+      "folders": []
     }
   ],
   "webhooks": [
@@ -20,6 +34,13 @@
       "type": "feishu",
       "url": "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR-WEBHOOK-TOKEN",
       "enabled": true
+    },
+    {
+      "id": "wh_email_17700000000",
+      "name": "邮件通知",
+      "type": "email",
+      "url": "notify@example.com",
+      "enabled": true
     }
   ],
   "rules": [
@@ -27,6 +48,9 @@
       "id": "rule_17700000000",
       "name": "转发全部",
       "source_account": "all",
+      "source_accounts": [
+        "all"
+      ],
       "target_webhook": "wh_17700000000",
       "target_webhooks": [
         "wh_17700000000"

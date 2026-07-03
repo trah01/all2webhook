@@ -8,7 +8,9 @@ import "time"
 type EmailAccount struct {
 	ID            string   `json:"id"`
 	Name          string   `json:"name"`
+	Type          string   `json:"type"` // "imap" 用于收件，"smtp" 用于发送通知
 	ImapServer    string   `json:"imap_server"`
+	SmtpServer    string   `json:"smtp_server"`
 	EmailUser     string   `json:"email_user"`
 	EmailPass     string   `json:"email_pass"`
 	Enabled       bool     `json:"enabled"`
@@ -31,6 +33,7 @@ type ForwardRule struct {
 	ID             string   `json:"id"`
 	Name           string   `json:"name"`
 	SourceAccount  string   `json:"source_account"`  // 邮箱账号ID、接收项目ID，"all" 表示所有
+	SourceAccounts []string `json:"source_accounts"` // 来源ID列表，包含 "all" 表示所有来源
 	TargetWebhook  string   `json:"target_webhook"`  // 兼容旧配置的单 Webhook 目标ID
 	TargetWebhooks []string `json:"target_webhooks"` // Webhook 目标ID列表
 	FilterRuleIDs  []string `json:"filter_rule_ids"` // 独立过滤规则ID

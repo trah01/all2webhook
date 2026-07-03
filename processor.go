@@ -56,8 +56,9 @@ func processPendingMessages() {
 		ruleMatched := false
 		filterBlocked := false
 		for _, rule := range rules {
+			rule = normalizeForwardRule(rule)
 			// 检查源账号匹配
-			if rule.SourceAccount != "all" && rule.SourceAccount != msg.AccountID {
+			if !ruleMatchesSource(rule, msg.AccountID) {
 				continue
 			}
 
@@ -69,7 +70,6 @@ func processPendingMessages() {
 				continue
 			}
 
-			rule = normalizeForwardRule(rule)
 			targetIDs := rule.TargetWebhooks
 			if len(targetIDs) == 0 {
 				continue
@@ -117,6 +117,8 @@ func processPendingMessages() {
 					sendErr = sendToDiscord(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
 				case "custom":
 					sendErr = sendToCustomWebhook(webhook.URL, subjectForSend, senderForSend, dateStr, displayBody)
+				case "email":
+					sendErr = sendToEmailNotification(webhook.URL, accounts, subjectForSend, senderForSend, dateStr, displayBody)
 				default:
 					sendErr = fmt.Errorf("不支持的 Webhook 类型: %s", webhook.Type)
 				}
@@ -166,6 +168,15 @@ func processPendingMessages() {
 			}
 		}
 	}
+}
+
+func ruleMatchesSource(rule ForwardRule, accountID string) bool {
+	for _, sourceID := range rule.SourceAccounts {
+		if sourceID == "all" || sourceID == accountID {
+			return true
+		}
+	}
+	return false
 }
 
 func buildFilterContext(msg *Message, accounts map[string]EmailAccount) filterContext {
@@ -222,7 +233,8 @@ func startBackgroundTasks() {
 			now := time.Now()
 			for i := range accounts {
 				acc := accounts[i]
-				if !acc.Enabled {
+				acc = normalizeEmailAccount(acc)
+				if !acc.Enabled || acc.Type != "imap" {
 					continue
 				}
 
