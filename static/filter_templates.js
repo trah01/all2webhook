@@ -1,5 +1,11 @@
 const filterTemplates = [
     {
+        name: '空白模板',
+        type: 'content',
+        mode: 'blacklist',
+        patterns: []
+    },
+    {
         name: '屏蔽营销邮件',
         type: 'content',
         mode: 'blacklist',
@@ -40,11 +46,5 @@ const filterTemplates = [
         type: 'all',
         mode: 'blacklist',
         patterns: ['test', '测试', 'debug', 'heartbeat']
-    },
-    {
-        name: '只转发账单发票',
-        type: 'content',
-        mode: 'whitelist',
-        patterns: ['账单', '发票', 'invoice', 'receipt', 'payment']
     }
 ];
