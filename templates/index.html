@@ -16,7 +16,7 @@
         <div class="nav">
             <div class="nav-brand">
                 <img class="nav-logo" src="/static/webhook.svg" alt="" aria-hidden="true">
-                All2Webhook
+                All2Webhook <span style="font-size: 0.75rem; font-weight: 500; opacity: 0.6; margin-left: 4px; vertical-align: middle;">v1.0.0</span>
             </div>
 
             <div class="nav-tabs">
@@ -121,13 +121,12 @@
                     <div class="stat-icon orange">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                             stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                            <polyline points="22,6 12,13 2,6" />
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <h3 id="stat-accounts">0</h3>
-                        <p>邮箱账号</p>
+                        <h3 id="stat-total">0</h3>
+                        <p>总转发量</p>
                     </div>
                 </div>
             </div>
@@ -143,12 +142,6 @@
                         </span>
                     </div>
                     <div class="card-header-actions">
-                        <select class="form-input compact-select" id="log-limit" onchange="loadLogs()">
-                            <option value="20">最近 20 条</option>
-                            <option value="50" selected>最近 50 条</option>
-                            <option value="100">最近 100 条</option>
-                            <option value="200">最近 200 条</option>
-                        </select>
                         <button class="btn btn-secondary btn-sm" onclick="clearLogs()">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">

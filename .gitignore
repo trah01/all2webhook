@@ -5,7 +5,7 @@
 
 # Build and Dependencies
 email2feishu
-mail2webhook
+all2webhook
 .gocache/
 .gomodcache/
 *.exe

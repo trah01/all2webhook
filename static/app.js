@@ -73,8 +73,10 @@ async function loadStats() {
         document.getElementById('stat-sent').textContent = stats?.sent || 0;
         document.getElementById('stat-failed').textContent = stats?.failed || 0;
 
-        const accData = await api('GET', '/api/accounts');
-        document.getElementById('stat-accounts').textContent = (accData && Array.isArray(accData)) ? accData.length : 0;
+        // 计算已转发消息的总转发量（所有状态之和）
+        const total = (stats?.pending || 0) + (stats?.sent || 0) + (stats?.failed || 0) + (stats?.ignored || 0) + (stats?.filtered || 0);
+        const totalEl = document.getElementById('stat-total');
+        if (totalEl) totalEl.textContent = total;
 
         // 更新最后检查时间状态
         if (stats?.last_checks) {
@@ -97,7 +99,7 @@ async function loadStats() {
 
 async function loadLogs() {
     try {
-        const limit = document.getElementById('log-limit')?.value || '50';
+        const limit = '50';
         logs = await api('GET', `/api/logs?limit=${encodeURIComponent(limit)}`);
         if (!logs || !Array.isArray(logs)) logs = [];
         renderLogs();

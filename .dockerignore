@@ -4,7 +4,7 @@
 .history
 *.log
 email2feishu
-mail2webhook
+all2webhook
 messages.db
 messages.db-shm
 messages.db-wal
