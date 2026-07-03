@@ -33,7 +33,9 @@ func setupPublicAPI(r *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 	r.Any("/hook/:secret", handleInboundHook)
+	r.Any("/hook/:secret/*extra", handleInboundHook)
 	r.Any("/webhook/:secret", handleInboundHook)
+	r.Any("/webhook/:secret/*extra", handleInboundHook)
 }
 
 func handleInboundHook(c *gin.Context) {
@@ -84,6 +86,10 @@ func parseInboundPayload(req *http.Request, body []byte) inboundPayload {
 	contentType := strings.ToLower(req.Header.Get("Content-Type"))
 	from := firstNonEmpty(req.Header.Get("X-GitHub-Delivery"), req.RemoteAddr, "external")
 
+	if parsed := parseBarkGETPayload(req); parsed != nil {
+		return *parsed
+	}
+
 	if strings.Contains(contentType, "application/json") || json.Valid(body) {
 		var data interface{}
 		if err := json.Unmarshal(body, &data); err == nil {
@@ -128,6 +134,81 @@ func parseInboundPayload(req *http.Request, body []byte) inboundPayload {
 		From:    from,
 		Body:    buildRawRequestBody(req, bodyText),
 	}
+}
+
+func parseBarkGETPayload(req *http.Request) *inboundPayload {
+	if req.Method != http.MethodGet {
+		return nil
+	}
+
+	query := req.URL.Query()
+	subject := firstNonEmpty(query.Get("title"), query.Get("subject"))
+	body := firstNonEmpty(query.Get("body"), query.Get("message"), query.Get("text"), query.Get("content"), query.Get("desp"))
+	group := strings.TrimSpace(query.Get("group"))
+
+	segments := extractBarkPathSegments(req.URL.EscapedPath())
+	switch {
+	case len(segments) >= 3:
+		group = firstNonEmpty(group, segments[0])
+		subject = firstNonEmpty(subject, segments[1])
+		body = firstNonEmpty(body, strings.Join(segments[2:], "/"))
+	case len(segments) == 2:
+		subject = firstNonEmpty(subject, segments[0])
+		body = firstNonEmpty(body, segments[1])
+	case len(segments) == 1:
+		body = firstNonEmpty(body, segments[0])
+	}
+
+	if subject == "" && body == "" {
+		return nil
+	}
+
+	lines := []string{body}
+	for _, key := range []string{"subtitle", "url", "sound", "icon", "level", "badge", "copy", "autoCopy"} {
+		if value := strings.TrimSpace(query.Get(key)); value != "" {
+			lines = append(lines, fmt.Sprintf("%s：%s", key, value))
+		}
+	}
+	if group != "" {
+		lines = append(lines, fmt.Sprintf("group：%s", group))
+	}
+
+	return &inboundPayload{
+		Subject: firstNonEmpty(subject, firstLine(body), "Bark 通知"),
+		From:    firstNonEmpty(query.Get("source"), query.Get("from"), "bark"),
+		Body:    strings.Join(nonEmptyLines(lines), "\n\n"),
+	}
+}
+
+func extractBarkPathSegments(escapedPath string) []string {
+	path := strings.Trim(escapedPath, "/")
+	if path == "" {
+		return nil
+	}
+
+	parts := strings.Split(path, "/")
+	if len(parts) <= 2 {
+		return nil
+	}
+	if parts[0] != "hook" && parts[0] != "webhook" {
+		return nil
+	}
+
+	segments := make([]string, 0, len(parts)-2)
+	for _, part := range parts[2:] {
+		if part == "" {
+			continue
+		}
+		text, err := url.PathUnescape(part)
+		if err != nil {
+			text = part
+		}
+		text = strings.TrimSpace(text)
+		if text != "" {
+			segments = append(segments, text)
+		}
+	}
+	return segments
 }
 
 func parseKnownJSONWebhook(data interface{}, event string) *inboundPayload {

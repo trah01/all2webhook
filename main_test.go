@@ -385,6 +385,43 @@ func TestParseInboundPayload_FormEncoded(t *testing.T) {
 	}
 }
 
+func TestParseInboundPayload_BarkGETQuery(t *testing.T) {
+	req, err := http.NewRequest("GET", "/hook/test?title=%E5%91%8A%E8%AD%A6&body=CPU%E8%BF%87%E9%AB%98&group=ops&url=https%3A%2F%2Fexample.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := parseInboundPayload(req, nil)
+
+	if got.Subject != "告警" {
+		t.Fatalf("expected Bark query title as subject, got %q", got.Subject)
+	}
+	if got.From != "bark" {
+		t.Fatalf("expected bark sender, got %q", got.From)
+	}
+	for _, want := range []string{"CPU过高", "group：ops", "url：https://example.com"} {
+		if !strings.Contains(got.Body, want) {
+			t.Fatalf("expected body to contain %q, got %q", want, got.Body)
+		}
+	}
+}
+
+func TestParseInboundPayload_BarkGETPath(t *testing.T) {
+	req, err := http.NewRequest("GET", "/hook/test/%E9%83%A8%E7%BD%B2/%E5%8F%91%E5%B8%83%E5%AE%8C%E6%88%90?subtitle=prod", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := parseInboundPayload(req, nil)
+
+	if got.Subject != "部署" {
+		t.Fatalf("expected Bark path title as subject, got %q", got.Subject)
+	}
+	if !strings.Contains(got.Body, "发布完成") || !strings.Contains(got.Body, "subtitle：prod") {
+		t.Fatalf("expected Bark path body and query options, got %q", got.Body)
+	}
+}
+
 func TestParseInboundPayload_GenericNestedFields(t *testing.T) {
 	req := newJSONRequest(t)
 	body := []byte(`{
