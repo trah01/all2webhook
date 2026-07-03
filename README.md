@@ -22,11 +22,8 @@ All2Webhook 是一个使用 Go 编写的通知集合转发为webhook服务，统
 ## Docker Compose 启动
 
 ```bash
-mkdir -p all2webhook
-cd all2webhook
 wget -O docker-compose.yml https://git.trah.cn/trah01/all2webhook/raw/branch/main/docker-compose.yml
-vi docker-compose.yml
-docker compose pull
+修改docker-compose.yml里的公开链接
 docker compose up -d
 ```
 
@@ -34,7 +31,7 @@ docker compose up -d
 
 - 管理界面：`http://localhost:8080`
 
-  **注意！！管理页面没有做任何鉴权，请勿对外开放此端口**
+  **注意！！管理页面没有做任何鉴权和安全防范措施，请勿对外开放此端口及页面，一定要限制**
 
 - 公开接收地址：`https://all2webhook.example.com`
 
