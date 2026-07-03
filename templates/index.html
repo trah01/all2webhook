@@ -317,6 +317,7 @@
                             <option value="pending">待发送</option>
                             <option value="sent">已发送</option>
                             <option value="failed">发送失败</option>
+                            <option value="filtered">已过滤</option>
                         </select>
                     </div>
                 </div>
@@ -627,6 +628,8 @@ unsubscribe
             </div>
         </div>
     </div>
+
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
     <!-- App Dialog -->
     <div id="app-dialog" class="app-dialog-overlay" role="dialog" aria-modal="true" aria-hidden="true">

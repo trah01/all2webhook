@@ -768,13 +768,69 @@ function showAppDialog(options = {}) {
 }
 
 function showAppAlert(message, options = {}) {
-    return showAppDialog({
-        title: options.title || '提示',
-        message,
-        type: options.type || 'info',
-        confirmText: options.confirmText || '确定',
-        showCancel: false
-    });
+    showAppToast(message, options);
+    return Promise.resolve(true);
+}
+
+function showAppToast(message, options = {}) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const type = options.type || 'info';
+    const title = options.title || '提示';
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.innerHTML = `
+        <div class="toast-indicator" aria-hidden="true"></div>
+        <div class="toast-copy">
+            <strong>${escapeHtml(title)}</strong>
+            <span>${escapeHtml(message)}</span>
+        </div>
+        <button class="toast-close" type="button" aria-label="关闭通知">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+
+    const removeToast = () => {
+        toast.classList.add('closing');
+        setTimeout(() => toast.remove(), 180);
+    };
+    toast.querySelector('.toast-close')?.addEventListener('click', removeToast);
+    container.appendChild(toast);
+    setTimeout(removeToast, options.duration || (type === 'error' ? 5200 : 2600));
+}
+
+async function copyTextToClipboard(text) {
+    if (!text) return false;
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (e) {
+        // 回退到 textarea 复制。
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
+    } finally {
+        textarea.remove();
+    }
+    return copied;
 }
 
 function showAppConfirm(message, options = {}) {

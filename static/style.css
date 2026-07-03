@@ -851,6 +851,124 @@ textarea.form-input {
     background: var(--bg-secondary);
 }
 
+/* ===================== Toasts ===================== */
+.toast-container {
+    position: fixed;
+    top: 68px;
+    right: 20px;
+    z-index: 360;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(360px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 14px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-md);
+    pointer-events: auto;
+    animation: toastIn 0.18s ease;
+}
+
+.toast.closing {
+    animation: toastOut 0.18s ease forwards;
+}
+
+.toast-indicator {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: 0 0 8px;
+}
+
+.toast-success .toast-indicator {
+    background: var(--success);
+}
+
+.toast-error .toast-indicator {
+    background: var(--error);
+}
+
+.toast-warning .toast-indicator {
+    background: var(--warning);
+}
+
+.toast-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.toast-copy strong,
+.toast-copy span {
+    display: block;
+}
+
+.toast-copy strong {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 650;
+}
+
+.toast-copy span {
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.toast-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 24px;
+}
+
+.toast-close:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.toast-close svg {
+    width: 14px;
+    height: 14px;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes toastOut {
+    to {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
 /* ===================== Log List ===================== */
 .log-list {
     max-height: 400px;

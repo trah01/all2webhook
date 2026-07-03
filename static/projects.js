@@ -110,10 +110,9 @@ async function deleteProject(id) {
 async function copyProjectURL(id) {
     const project = projects.find(item => item.id === id);
     if (!project?.url) return;
-    try {
-        await navigator.clipboard.writeText(project.url);
-        await showAppAlert('接收 URL 已复制', { type: 'success', title: '复制完成' });
-    } catch (e) {
-        await showAppAlert(project.url, { type: 'info', title: '接收 URL' });
-    }
+    const copied = await copyTextToClipboard(project.url);
+    await showAppAlert(copied ? '接收 URL 已复制' : '复制失败，请手动复制表格中的 URL', {
+        type: copied ? 'success' : 'error',
+        title: copied ? '已复制' : '复制失败'
+    });
 }
