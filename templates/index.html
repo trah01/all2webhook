@@ -619,7 +619,7 @@
                             <button class="btn btn-secondary btn-sm" type="button" onclick="fillWebhookTemplateSample()">填入示例模板</button>
                         </div>
                         <textarea class="form-input code-input" id="webhook-template" rows="9" placeholder="留空则使用所选渠道的默认 payload"></textarea>
-                        <div class="form-hint">支持占位符：{{subject}}、{{from}}、{{date}}、{{body}}</div>
+                        <div class="form-hint">支持占位符：{{"{{subject}}"}}、{{"{{from}}"}}、{{"{{date}}"}}、{{"{{body}}"}}</div>
                     </div>
                     <details class="advanced-section webhook-http-field">
                         <summary>高级 HTTP 与证书配置</summary>
