@@ -22,6 +22,7 @@ var (
 	accountChecking  sync.Map                                  // 防止同一个账号的 IMAP 检查并发
 	processingMutex  sync.Mutex                                // 防止并发处理待发送消息
 	httpClient       = &http.Client{Timeout: 15 * time.Second} // 全局 Webhook 请求带超时的客户端
+	serviceStartedAt = time.Now()                              // 只处理服务启动后收到的邮件，避免重启后转发历史未读
 )
 
 const (

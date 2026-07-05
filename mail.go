@@ -179,6 +179,51 @@ func displaySubject(subject string) string {
 	return subject
 }
 
+func messageDateForFilter(msg *imap.Message) time.Time {
+	if msg == nil {
+		return time.Time{}
+	}
+	if msg.Envelope != nil && !msg.Envelope.Date.IsZero() {
+		return msg.Envelope.Date
+	}
+	return msg.InternalDate
+}
+
+func messageDateForStore(msg *imap.Message) time.Time {
+	if msg == nil || msg.Envelope == nil || msg.Envelope.Date.IsZero() {
+		return time.Time{}
+	}
+	return msg.Envelope.Date
+}
+
+func displayMessageDate(date time.Time) string {
+	if date.IsZero() {
+		return "无发送时间"
+	}
+	utc8 := time.FixedZone("UTC+8", 8*60*60)
+	return date.In(utc8).Format("2006-01-02 15:04:05")
+}
+
+func fetchFirstMessage(c *client.Client, seqSet *imap.SeqSet, items []imap.FetchItem) (*imap.Message, error) {
+	messages := make(chan *imap.Message, 1)
+	fetchDone := make(chan error, 1)
+
+	go func() {
+		fetchDone <- c.UidFetch(seqSet, items, messages)
+	}()
+
+	var msg *imap.Message
+	for m := range messages {
+		if msg == nil {
+			msg = m
+		}
+	}
+	if err := <-fetchDone; err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
 func checkMailForAccount(account *EmailAccount) {
 	if !account.Enabled {
 		return
@@ -270,22 +315,8 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 		seqSet := new(imap.SeqSet)
 		seqSet.AddNum(uid)
 
-		var section imap.BodySectionName
-		items := []imap.FetchItem{section.FetchItem(), imap.FetchEnvelope, imap.FetchInternalDate}
-		messages := make(chan *imap.Message, 1)
-		fetchDone := make(chan error, 1)
-
-		go func() {
-			fetchDone <- c.UidFetch(seqSet, items, messages)
-		}()
-
-		var msg *imap.Message
-		for m := range messages {
-			if msg == nil {
-				msg = m // 获取第一个拿去处理，剩下的强行消费完（防止 IMAP Server 返回多个对象导致 Channel 卡死 goroutine 泄露）
-			}
-		}
-		if fetchErr := <-fetchDone; fetchErr != nil {
+		msg, fetchErr := fetchFirstMessage(c, seqSet, []imap.FetchItem{imap.FetchEnvelope, imap.FetchInternalDate})
+		if fetchErr != nil {
 			addLog(fmt.Sprintf("读取邮件失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, fetchErr), "error")
 			continue
 		}
@@ -294,13 +325,30 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 			addLog(fmt.Sprintf("读取邮件为空 [%s/%s uid=%d]", account.Name, folder, uid), "warning")
 			continue
 		}
+		filterDate := messageDateForFilter(msg)
+		if filterDate.IsZero() || filterDate.Before(serviceStartedAt) {
+			addLog(fmt.Sprintf("跳过历史邮件 [%s/%s uid=%d]: %s", account.Name, folder, uid, displaySubject(msg.Envelope.Subject)), "info")
+			continue
+		}
 
 		from := ""
 		if len(msg.Envelope.From) > 0 {
 			from = msg.Envelope.From[0].Address()
 		}
 
-		r := msg.GetBody(&section)
+		var section imap.BodySectionName
+		bodyMsg, fetchErr := fetchFirstMessage(c, seqSet, []imap.FetchItem{section.FetchItem()})
+		if fetchErr != nil {
+			addLog(fmt.Sprintf("读取邮件正文失败 [%s/%s uid=%d]: %v", account.Name, folder, uid, fetchErr), "error")
+			continue
+		}
+
+		if bodyMsg == nil {
+			addLog(fmt.Sprintf("读取邮件正文为空 [%s/%s uid=%d]: %s", account.Name, folder, uid, displaySubject(msg.Envelope.Subject)), "warning")
+			continue
+		}
+
+		r := bodyMsg.GetBody(&section)
 		if r == nil {
 			addLog(fmt.Sprintf("邮件正文为空 [%s/%s uid=%d]: %s", account.Name, folder, uid, displaySubject(msg.Envelope.Subject)), "warning")
 			continue
@@ -342,7 +390,7 @@ func checkFolderForAccount(account *EmailAccount, folder string) {
 			Subject:     msg.Envelope.Subject,
 			From:        from,
 			To:          account.EmailUser,
-			Date:        msg.Envelope.Date,
+			Date:        messageDateForStore(msg),
 			Body:        body,
 			BodyHTML:    bodyHTML,
 			Status:      "pending",
