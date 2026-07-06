@@ -27,14 +27,16 @@ function renderProjects() {
         return;
     }
 
-    tbody.innerHTML = projects.map(project => `
+    tbody.innerHTML = projects.map(project => {
+        const projectURL = escapeHtml(project.url || '');
+        return `
         <tr>
             <td>
                 <strong>${escapeHtml(project.name)}</strong>
                 <div class="muted-line">${escapeHtml(project.id)}</div>
             </td>
             <td>
-                <code class="inline-code">${escapeHtml(project.url || '')}</code>
+                <code class="inline-code" title="${projectURL}">${projectURL}</code>
             </td>
             <td>
                 <span class="tag ${project.enabled ? 'tag-success' : 'tag-neutral'}">
@@ -49,7 +51,8 @@ function renderProjects() {
                 <button class="btn btn-danger btn-sm" onclick="deleteProject('${project.id}')">删除</button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function openProjectModal(id = '') {

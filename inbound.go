@@ -91,28 +91,19 @@ func parseInboundPayload(req *http.Request, body []byte) inboundPayload {
 	}
 
 	if strings.Contains(contentType, "application/json") || json.Valid(body) {
-		var data interface{}
-		if err := json.Unmarshal(body, &data); err == nil {
-			if parsed := parseKnownJSONWebhook(data, event); parsed != nil {
-				parsed.From = firstNonEmpty(parsed.From, from)
-				return *parsed
-			}
-			subject, _ := extractJSONSummary(data)
-			if event != "" {
-				subject = firstNonEmpty(formatGitHubSubject(event, data), subject)
-				from = "github"
-			}
-			return inboundPayload{
-				Subject: firstNonEmpty(subject, "外部通知"),
-				From:    from,
-				Body:    formatJSONBody(data, body),
-			}
+		if payload, ok := parseJSONInboundPayload(body, event, from); ok {
+			return payload
 		}
 	}
 
 	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
 		values, err := url.ParseQuery(string(body))
 		if err == nil {
+			if rawPayload := strings.TrimSpace(values.Get("payload")); rawPayload != "" {
+				if payload, ok := parseJSONInboundPayload([]byte(rawPayload), event, from); ok {
+					return payload
+				}
+			}
 			subject := firstNonEmpty(values.Get("title"), values.Get("subject"), values.Get("summary"), values.Get("text"))
 			text := firstNonEmpty(values.Get("message"), values.Get("body"), values.Get("desp"), values.Get("content"), values.Get("text"))
 			if text != "" {
@@ -134,6 +125,27 @@ func parseInboundPayload(req *http.Request, body []byte) inboundPayload {
 		From:    from,
 		Body:    buildRawRequestBody(req, bodyText),
 	}
+}
+
+func parseJSONInboundPayload(body []byte, event string, from string) (inboundPayload, bool) {
+	var data interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return inboundPayload{}, false
+	}
+	if parsed := parseKnownJSONWebhook(data, event); parsed != nil {
+		parsed.From = firstNonEmpty(parsed.From, from)
+		return *parsed, true
+	}
+	subject, _ := extractJSONSummary(data)
+	if event != "" {
+		subject = firstNonEmpty(formatGitHubSubject(event, data), subject)
+		from = "github"
+	}
+	return inboundPayload{
+		Subject: firstNonEmpty(subject, "外部通知"),
+		From:    from,
+		Body:    formatJSONBody(data, body),
+	}, true
 }
 
 func parseBarkGETPayload(req *http.Request) *inboundPayload {

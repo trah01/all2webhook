@@ -219,6 +219,31 @@ func TestParseInboundPayload_GitHubPush(t *testing.T) {
 	}
 }
 
+func TestParseInboundPayload_GitHubFormPayload(t *testing.T) {
+	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-GitHub-Event", "ping")
+	body := []byte(`payload=%7B%22zen%22%3A%22Responsive+is+better+than+fast.%22%2C%22repository%22%3A%7B%22full_name%22%3A%22trah01%2Fall2webhook%22%7D%2C%22sender%22%3A%7B%22login%22%3A%22trah01%22%7D%7D`)
+
+	got := parseInboundPayload(req, body)
+
+	if got.Subject != "GitHub ping trah01/all2webhook" {
+		t.Fatalf("expected GitHub ping subject, got %q", got.Subject)
+	}
+	if got.From != "github" {
+		t.Fatalf("expected github sender, got %q", got.From)
+	}
+	if strings.Contains(got.Body, "payload=%7B") {
+		t.Fatalf("expected decoded GitHub body, got %q", got.Body)
+	}
+	if !strings.Contains(got.Body, "仓库：trah01/all2webhook") {
+		t.Fatalf("expected readable repository body, got %q", got.Body)
+	}
+}
+
 func TestParseInboundPayload_UnknownBodyIsPreserved(t *testing.T) {
 	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
 	if err != nil {

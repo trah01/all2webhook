@@ -8,7 +8,7 @@ import (
 
 // ===================== 日志管理 =====================
 
-const noisyPollingLogWindow = 10 * time.Minute
+const backendPollingLogWindow = 10 * time.Minute
 
 var recentPollingLogs = make(map[string]time.Time)
 
@@ -17,7 +17,10 @@ func addLog(msg string, logType string) {
 	defer logsMutex.Unlock()
 
 	now := time.Now()
-	if shouldSuppressPollingLog(msg, logType, now) {
+	if isFrontendHiddenPollingLog(msg, logType) {
+		if !shouldSuppressBackendPollingLog(msg, logType, now) {
+			writeConsoleLog(msg, logType)
+		}
 		return
 	}
 
@@ -32,6 +35,10 @@ func addLog(msg string, logType string) {
 	}
 
 	// 同时输出到控制台
+	writeConsoleLog(msg, logType)
+}
+
+func writeConsoleLog(msg string, logType string) {
 	prefix := map[string]string{
 		"info":    "[INFO]",
 		"success": "[OK]",
@@ -41,23 +48,19 @@ func addLog(msg string, logType string) {
 	log.Printf("%s %s", prefix, msg)
 }
 
-func shouldSuppressPollingLog(msg string, logType string, now time.Time) bool {
-	if logType != "info" && logType != "warning" {
-		return false
-	}
-	if !isNoisyPollingLog(msg) {
-		return false
-	}
-
+func shouldSuppressBackendPollingLog(msg string, logType string, now time.Time) bool {
 	key := logType + "\x00" + msg
-	if last, ok := recentPollingLogs[key]; ok && now.Sub(last) < noisyPollingLogWindow {
+	if last, ok := recentPollingLogs[key]; ok && now.Sub(last) < backendPollingLogWindow {
 		return true
 	}
 	recentPollingLogs[key] = now
 	return false
 }
 
-func isNoisyPollingLog(msg string) bool {
+func isFrontendHiddenPollingLog(msg string, logType string) bool {
+	if logType != "info" && logType != "warning" {
+		return false
+	}
 	return strings.HasPrefix(msg, "检查邮箱文件夹 ") ||
 		strings.HasPrefix(msg, "邮箱文件夹 ") ||
 		strings.HasPrefix(msg, "跳过历史邮件 ")
