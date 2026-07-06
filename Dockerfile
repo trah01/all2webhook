@@ -20,8 +20,8 @@ FROM alpine:latest
 
 WORKDIR /app
 
-# Install certificates for HTTPS
-RUN apk --no-cache add ca-certificates
+# Install certificates for HTTPS and timezone data for TZ=Asia/Shanghai
+RUN apk --no-cache add ca-certificates tzdata
 
 # Copy from builder
 COPY --from=builder /app/all2webhook /app/all2webhook
