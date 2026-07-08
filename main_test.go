@@ -25,7 +25,7 @@ func TestCleanHTML_PreservesReadableStructure(t *testing.T) {
 	}
 }
 
-func TestFormatPlainTextBody_ConvertsURLToMarkdownAndTruncatesLongLinks(t *testing.T) {
+func TestFormatPlainTextBody_ConvertsURLToMarkdownAndRemovesLongLinks(t *testing.T) {
 	body := "请查看 https://example.com/docs?id=1 和这个超长链接 https://example.com/" + strings.Repeat("a", 650)
 
 	got := formatPlainTextBody(body)
@@ -33,8 +33,8 @@ func TestFormatPlainTextBody_ConvertsURLToMarkdownAndTruncatesLongLinks(t *testi
 	if !strings.Contains(got, "[https://example.com/docs?id=1](https://example.com/docs?id=1)") {
 		t.Fatalf("expected normal URL converted to markdown link, got: %q", got)
 	}
-	if !strings.Contains(got, "长链接由于超长已被过滤") {
-		t.Fatalf("expected overlong URL filtered message, got: %q", got)
+	if strings.Contains(got, strings.Repeat("a", 80)) || strings.Contains(got, "长链接由于超长已被过滤") {
+		t.Fatalf("expected overlong URL removed without placeholder, got: %q", got)
 	}
 }
 
@@ -71,6 +71,32 @@ func TestFormatPlainTextBody_FirstLineUsesTwoSpaceIndent(t *testing.T) {
 	}
 	if strings.HasPrefix(lines[0], "   ") {
 		t.Fatalf("expected first line to be exactly two spaces, got: %q", lines[0])
+	}
+}
+
+func TestFormatForwardBody_RemovesLinksByDefault(t *testing.T) {
+	body := "查看 [详情](https://example.com/docs?id=1)\n链接：https://example.com/raw\n第二段"
+
+	got := formatForwardBody(body, false)
+
+	if strings.Contains(got, "https://") || strings.Contains(got, "[详情]") {
+		t.Fatalf("expected links removed by default, got: %q", got)
+	}
+	if !strings.Contains(got, "查看 详情") || !strings.Contains(got, "第二段") {
+		t.Fatalf("expected readable text preserved, got: %q", got)
+	}
+}
+
+func TestFormatForwardBody_KeepsShortLinksAndRemovesLongLinksWhenEnabled(t *testing.T) {
+	body := "查看 https://example.com/docs?id=1\n长链接：https://example.com/" + strings.Repeat("b", 650)
+
+	got := formatForwardBody(body, true)
+
+	if !strings.Contains(got, "[https://example.com/docs?id=1](https://example.com/docs?id=1)") {
+		t.Fatalf("expected short URL converted to markdown link, got: %q", got)
+	}
+	if strings.Contains(got, strings.Repeat("b", 80)) {
+		t.Fatalf("expected overlong URL removed, got: %q", got)
 	}
 }
 

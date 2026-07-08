@@ -26,5 +26,7 @@ var (
 )
 
 const (
-	ConfigFile = "data/config.json"
+	ConfigFile              = "data/config.json"
+	maxForwardURLLength     = 600
+	maxForwardLinkTextRunes = 80
 )

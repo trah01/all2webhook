@@ -84,7 +84,7 @@ func processPendingMessages() {
 			senderForSend := filterCtx.DisplaySender
 
 			// 智能提取验证码并高亮前置
-			displayBody := msg.Body
+			displayBody := formatForwardBody(msg.Body, rule.IncludeLinks)
 			var verificationCode string
 			if matches := codeRegex.FindStringSubmatch(msg.Subject); len(matches) > 1 {
 				verificationCode = matches[1]
@@ -93,7 +93,7 @@ func processPendingMessages() {
 			}
 
 			if verificationCode != "" {
-				displayBody = fmt.Sprintf("**[智能提取验证码] %s**\n\n%s", verificationCode, msg.Body)
+				displayBody = fmt.Sprintf("**[智能提取验证码] %s**\n\n%s", verificationCode, displayBody)
 			}
 
 			sentTargets := make([]string, 0, len(targetIDs))

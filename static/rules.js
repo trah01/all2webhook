@@ -63,6 +63,7 @@ function renderRules() {
                 <td>${targetNames.length ? targetNames.map(name => `<span class="tag tag-info">${escapeHtml(name)}</span>`).join(' ') : '未知'}</td>
                 <td>
                     ${selectedFilters.length ? selectedFilters.map(f => `<span class="tag tag-info">${escapeHtml(f.name)}</span>`).join(' ') : '无'}
+                    ${rule.include_links ? '<span class="tag tag-neutral">保留链接</span>' : ''}
                 </td>
                 <td>
                     <span class="tag ${rule.enabled ? 'tag-success' : 'tag-neutral'}">
@@ -140,6 +141,7 @@ async function openRuleModal(data = null) {
     renderRuleSourceDropdown(normalizeRuleSources(data || { source_account: 'all' }));
     renderRuleTargetDropdown(normalizeRuleTargets(data || {}));
     renderRuleFilterDropdown(data?.filter_rule_ids || []);
+    document.getElementById('rule-include-links').checked = data?.include_links === true;
     document.getElementById('rule-enabled').checked = data?.enabled !== false;
     document.getElementById('rule-modal').classList.add('active');
 }
@@ -341,6 +343,7 @@ async function saveRule() {
         target_webhook: targetIDs[0] || '',
         target_webhooks: targetIDs,
         filter_rule_ids: getSelectedRuleFilterIDs(),
+        include_links: document.getElementById('rule-include-links').checked,
         enabled: document.getElementById('rule-enabled').checked
     };
 

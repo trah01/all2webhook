@@ -807,6 +807,13 @@ unsubscribe
                     </div>
                     <div class="form-group">
                         <label class="form-checkbox">
+                            <input type="checkbox" id="rule-include-links">
+                            <span>保留邮件正文中的链接</span>
+                        </label>
+                        <div class="form-hint">默认关闭。关闭时转发正文会移除链接；开启时短链接会转换为 Markdown 超链接，超长链接会删除。</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-checkbox">
                             <input type="checkbox" id="rule-enabled" checked>
                             <span>启用此规则</span>
                         </label>

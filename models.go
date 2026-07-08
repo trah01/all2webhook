@@ -54,6 +54,7 @@ type ForwardRule struct {
 	TargetWebhook  string   `json:"target_webhook"`  // 兼容旧配置的单 Webhook 目标ID
 	TargetWebhooks []string `json:"target_webhooks"` // Webhook 目标ID列表
 	FilterRuleIDs  []string `json:"filter_rule_ids"` // 独立过滤规则ID
+	IncludeLinks   bool     `json:"include_links"`   // 是否在转发正文中保留邮件链接，默认不保留
 	Enabled        bool     `json:"enabled"`
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 )
 
 // ===================== 邮件处理 =====================
+
+var markdownLinkRegex = regexp.MustCompile(`\[([^\]\n]{0,240})\]\((https?://[^)\s]+|长链接由于超长已被过滤)\)`)
 
 func cleanHTML(htmlStr string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
@@ -35,14 +38,14 @@ func cleanHTML(htmlStr string) string {
 		href = sanitizeURL(href)
 		if text == "" {
 			text = "链接"
-		} else if len(text) > 80 {
-			text = text[:77] + "..."
+		} else {
+			text = truncateRunes(text, maxForwardLinkTextRunes)
 		}
 		text = escapeMarkdownText(text)
 		if href != "" {
 			href = escapeMarkdownLinkURL(href)
-			if len(href) > 600 {
-				s.SetText(fmt.Sprintf("[%s](长链接由于超长已被过滤)", text))
+			if len(href) > maxForwardURLLength {
+				s.SetText(text)
 			} else {
 				s.SetText(fmt.Sprintf("[%s](%s)", text, href))
 			}
@@ -62,8 +65,8 @@ func cleanHTML(htmlStr string) string {
 
 	text := normalizeFormattedText(doc.Text())
 	text = urlRegex.ReplaceAllStringFunc(text, func(u string) string {
-		if len(u) > 600 {
-			return u[:80] + "...(该段长链接由于超长已被过滤)"
+		if len(u) > maxForwardURLLength {
+			return ""
 		}
 		return u
 	})
@@ -146,17 +149,110 @@ func normalizeFormattedText(text string) string {
 
 func formatPlainTextBody(body string) string {
 	body = urlRegex.ReplaceAllStringFunc(body, func(u string) string {
-		disp := u
-		if len(disp) > 80 {
-			disp = disp[:77] + "..."
+		if len(u) > maxForwardURLLength {
+			return ""
 		}
+		disp := truncateRunes(u, maxForwardLinkTextRunes)
 		u = escapeMarkdownLinkURL(u)
-		if len(u) > 600 {
-			return fmt.Sprintf("[%s](长链接由于超长已被过滤)", disp)
-		}
 		return fmt.Sprintf("[%s](%s)", disp, u)
 	})
 	return normalizeFormattedText(body)
+}
+
+func formatForwardBody(body string, includeLinks bool) string {
+	body = normalizeFormattedText(body)
+	if includeLinks {
+		return normalizeFormattedText(formatURLsAsMarkdown(body))
+	}
+	return normalizeFormattedText(removeLinksFromText(body))
+}
+
+func formatURLsAsMarkdown(text string) string {
+	var b strings.Builder
+	last := 0
+	matches := urlRegex.FindAllStringIndex(text, -1)
+	for _, loc := range matches {
+		start, end := loc[0], loc[1]
+		if isMarkdownURLDestination(text, start, end) {
+			continue
+		}
+		u := text[start:end]
+		b.WriteString(text[last:start])
+		if len(u) <= maxForwardURLLength {
+			disp := truncateRunes(u, maxForwardLinkTextRunes)
+			b.WriteString(fmt.Sprintf("[%s](%s)", disp, escapeMarkdownLinkURL(u)))
+		}
+		last = end
+	}
+	if last == 0 {
+		return text
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}
+
+func removeLinksFromText(text string) string {
+	text = markdownLinkRegex.ReplaceAllStringFunc(text, func(match string) string {
+		parts := markdownLinkRegex.FindStringSubmatch(match)
+		if len(parts) < 2 {
+			return ""
+		}
+		return unescapeMarkdownText(parts[1])
+	})
+	text = urlRegex.ReplaceAllString(text, "")
+
+	lines := strings.Split(text, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if isDanglingLinkLabel(line) {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
+func isMarkdownURLDestination(text string, start int, end int) bool {
+	if start <= 0 || text[start-1] != '(' {
+		return false
+	}
+	return (end < len(text) && text[end] == ')') || (end > start && text[end-1] == ')')
+}
+
+func isDanglingLinkLabel(line string) bool {
+	line = strings.TrimSpace(line)
+	line = strings.TrimRight(line, "：:")
+	switch strings.ToLower(line) {
+	case "链接", "url", "link":
+		return true
+	default:
+		return false
+	}
+}
+
+func truncateRunes(text string, max int) string {
+	runes := []rune(text)
+	if len(runes) <= max {
+		return text
+	}
+	if max <= 3 {
+		return string(runes[:max])
+	}
+	return string(runes[:max-3]) + "..."
+}
+
+func unescapeMarkdownText(text string) string {
+	replacer := strings.NewReplacer(
+		`\\[`, `[`,
+		`\\]`, `]`,
+		`\\(`, `(`,
+		`\\)`, `)`,
+		"\\`", "`",
+		`\\*`, `*`,
+		`\\_`, `_`,
+		`\\\\`, `\`,
+	)
+	return replacer.Replace(text)
 }
 
 func normalizeFolderKey(folder string) string {

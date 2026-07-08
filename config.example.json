@@ -97,6 +97,7 @@
         "wh_17700000000"
       ],
       "filter_rule_ids": [],
+      "include_links": false,
       "enabled": true
     }
   ],
