@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type plannedForwardTarget struct {
+	ID           string
+	IncludeLinks bool
+}
+
 func processPendingMessages() {
 	// 防止消息发送队列重叠并发引发重复发送通知
 	if !processingMutex.TryLock() {
@@ -52,80 +57,61 @@ func processPendingMessages() {
 			continue
 		}
 
-		// 匹配规则，找到第一条匹配的规则进行发送
-		ruleMatched := false
-		filterBlocked := false
-		for _, rule := range rules {
-			rule = normalizeForwardRule(rule)
-			// 检查源账号匹配
-			if !ruleMatchesSource(rule, msg.AccountID) {
-				continue
-			}
+		// 汇总所有匹配规则的目标。同一目标被多条规则命中时只发送一次。
+		filterCtx := buildFilterContext(&msg, accounts)
+		targets, sourceMatched, filterBlocked := planForwardTargets(rules, filterRules, &msg, filterCtx)
+		ruleMatched := len(targets) > 0
+		for _, reason := range filterBlocked {
+			addLog(fmt.Sprintf("消息被过滤规则拦截 [%s]: %s", displaySubject(msg.Subject), reason), "info")
+		}
 
-			filterCtx := buildFilterContext(&msg, accounts)
-			filterResult := applyFilterRules(rule.FilterRuleIDs, filterRules, &msg, filterCtx)
-			if !filterResult.Allowed {
-				filterBlocked = true
-				addLog(fmt.Sprintf("消息被过滤规则拦截 [%s]: %s", displaySubject(msg.Subject), filterResult.Reason), "info")
-				continue
-			}
-
-			targetIDs := rule.TargetWebhooks
-			if len(targetIDs) == 0 {
-				continue
-			}
-
-			ruleMatched = true
-
-			// 发送
-			var sendErr error
+		if ruleMatched {
 			dateStr := displayMessageDate(msg.Date)
 			subjectForSend := displaySubject(msg.Subject)
 			senderForSend := filterCtx.DisplaySender
-
-			// 智能提取验证码并高亮前置
-			displayBody := formatForwardBody(msg.Body, rule.IncludeLinks)
-			var verificationCode string
-			if matches := codeRegex.FindStringSubmatch(msg.Subject); len(matches) > 1 {
-				verificationCode = matches[1]
-			} else if matches := codeRegex.FindStringSubmatch(msg.Body); len(matches) > 1 {
-				verificationCode = matches[1]
-			}
-
-			if verificationCode != "" {
-				displayBody = fmt.Sprintf("**[智能提取验证码] %s**\n\n%s", verificationCode, displayBody)
-			}
-
-			sentTargets := make([]string, 0, len(targetIDs))
+			verificationCode := extractVerificationCode(&msg)
+			sentTargets := make([]string, 0, len(targets))
 			failedTargets := make([]string, 0)
-			for _, targetID := range targetIDs {
-				webhook, ok := webhooks[targetID]
-				if !ok || !webhook.Enabled {
+			historyTargets := make([]string, 0, len(targets))
+
+			for _, planned := range targets {
+				webhook, ok := webhooks[planned.ID]
+				if !ok {
+					failedTargets = append(failedTargets, fmt.Sprintf("%s: 目标渠道不存在", planned.ID))
+					historyTargets = append(historyTargets, planned.ID+"（失败）")
+					continue
+				}
+				if !webhook.Enabled {
+					failedTargets = append(failedTargets, fmt.Sprintf("%s: 目标渠道已禁用", webhook.Name))
+					historyTargets = append(historyTargets, webhook.Name+"（失败）")
 					continue
 				}
 
-				sendErr = sendToWebhookTarget(webhook, accounts, subjectForSend, senderForSend, dateStr, displayBody)
+				displayBody := formatForwardBody(msg.Body, planned.IncludeLinks)
+				if verificationCode != "" {
+					displayBody = fmt.Sprintf("**[智能提取验证码] %s**\n\n%s", verificationCode, displayBody)
+				}
 
-				if sendErr != nil {
-					failedTargets = append(failedTargets, fmt.Sprintf("%s: %v", webhook.Name, sendErr))
-					addLog(fmt.Sprintf("发送失败 [%s -> %s]: %v", subjectForSend, webhook.Name, sendErr), "error")
+				if err := sendToWebhookTarget(webhook, accounts, subjectForSend, senderForSend, dateStr, displayBody); err != nil {
+					failedTargets = append(failedTargets, fmt.Sprintf("%s: %v", webhook.Name, err))
+					historyTargets = append(historyTargets, webhook.Name+"（失败）")
+					addLog(fmt.Sprintf("发送失败 [%s -> %s]: %v", subjectForSend, webhook.Name, err), "error")
 					continue
 				}
 				sentTargets = append(sentTargets, webhook.Name)
+				historyTargets = append(historyTargets, webhook.Name)
 				addLog(fmt.Sprintf("转发成功 [%s -> %s]", subjectForSend, webhook.Name), "success")
 			}
 
+			msg.TargetType = "multi"
+			msg.TargetName = strings.Join(historyTargets, ", ")
 			if len(sentTargets) == 0 {
 				msg.RetryCount++
 				msg.ErrorMessage = strings.Join(failedTargets, "; ")
-				if msg.ErrorMessage == "" {
-					msg.ErrorMessage = "没有可用的目标 Webhook"
-				}
 				saveMessage(&msg)
 			} else {
 				msg.Status = "sent"
-				msg.TargetType = "multi"
-				msg.TargetName = strings.Join(sentTargets, ", ")
+				msg.ErrorMessage = ""
 				if len(failedTargets) > 0 {
 					msg.ErrorMessage = "部分目标失败: " + strings.Join(failedTargets, "; ")
 				}
@@ -133,12 +119,11 @@ func processPendingMessages() {
 				msg.SentAt = &now
 				saveMessage(&msg)
 			}
-			break // 匹配到第一条规则并尝试发送后，不再继续匹配后续规则
 		}
 
-		// 没有匹配到任何转发规则的消息，标记为 no_rule 防止永远卡在 pending 堵塞队列
+		// 没有匹配到任何转发规则的消息，标记状态防止永远卡在 pending 堵塞队列。
 		if !ruleMatched {
-			if filterBlocked {
+			if sourceMatched && len(filterBlocked) > 0 {
 				msg.Status = "filtered"
 				msg.ErrorMessage = "已被过滤规则拦截"
 				saveMessage(&msg)
@@ -151,6 +136,49 @@ func processPendingMessages() {
 			}
 		}
 	}
+}
+
+func planForwardTargets(rules []ForwardRule, filterRules map[string]FilterRule, msg *Message, filterCtx filterContext) ([]plannedForwardTarget, bool, []string) {
+	targets := make([]plannedForwardTarget, 0)
+	targetIndexes := make(map[string]int)
+	sourceMatched := false
+	blockedReasons := make([]string, 0)
+
+	for _, rule := range rules {
+		rule = normalizeForwardRule(rule)
+		if !ruleMatchesSource(rule, msg.AccountID) {
+			continue
+		}
+		sourceMatched = true
+
+		filterResult := applyFilterRules(rule.FilterRuleIDs, filterRules, msg, filterCtx)
+		if !filterResult.Allowed {
+			blockedReasons = append(blockedReasons, filterResult.Reason)
+			continue
+		}
+
+		for _, targetID := range rule.TargetWebhooks {
+			if index, exists := targetIndexes[targetID]; exists {
+				// 任一匹配规则要求保留链接时，为该目标保留链接。
+				targets[index].IncludeLinks = targets[index].IncludeLinks || rule.IncludeLinks
+				continue
+			}
+			targetIndexes[targetID] = len(targets)
+			targets = append(targets, plannedForwardTarget{ID: targetID, IncludeLinks: rule.IncludeLinks})
+		}
+	}
+
+	return targets, sourceMatched, blockedReasons
+}
+
+func extractVerificationCode(msg *Message) string {
+	if matches := codeRegex.FindStringSubmatch(msg.Subject); len(matches) > 1 {
+		return matches[1]
+	}
+	if matches := codeRegex.FindStringSubmatch(msg.Body); len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
 }
 
 func ruleMatchesSource(rule ForwardRule, accountID string) bool {

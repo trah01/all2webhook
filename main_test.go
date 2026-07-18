@@ -223,6 +223,70 @@ func TestNormalizeForwardRule_MigratesSingleTargetAndDeduplicates(t *testing.T) 
 	}
 }
 
+func TestPlanForwardTargets_CollectsAllMatchingRulesAndDeduplicates(t *testing.T) {
+	msg := &Message{AccountID: "acc_1", Subject: "测试通知", Body: "正文"}
+	rules := []ForwardRule{
+		{
+			SourceAccount: "acc_1",
+			TargetWebhook: "wh_feishu",
+		},
+		{
+			SourceAccounts: []string{"acc_1"},
+			TargetWebhooks: []string{"wh_dingtalk", "wh_feishu"},
+			IncludeLinks:   true,
+		},
+		{
+			SourceAccount: "acc_other",
+			TargetWebhook: "wh_other",
+		},
+	}
+
+	targets, sourceMatched, blockedReasons := planForwardTargets(rules, nil, msg, filterContext{})
+
+	if !sourceMatched {
+		t.Fatal("expected source to match forwarding rules")
+	}
+	if len(blockedReasons) != 0 {
+		t.Fatalf("expected no blocked rules, got %#v", blockedReasons)
+	}
+	if len(targets) != 2 {
+		t.Fatalf("expected two unique targets, got %#v", targets)
+	}
+	if targets[0].ID != "wh_feishu" || targets[1].ID != "wh_dingtalk" {
+		t.Fatalf("expected targets from every matching rule in order, got %#v", targets)
+	}
+	if !targets[0].IncludeLinks || !targets[1].IncludeLinks {
+		t.Fatalf("expected include-links option to be merged per target, got %#v", targets)
+	}
+}
+
+func TestPlanForwardTargets_FilteredRuleDoesNotBlockAnotherMatchingRule(t *testing.T) {
+	msg := &Message{AccountID: "acc_1", From: "notice@example.com", Subject: "普通通知", Body: "正文"}
+	filterRules := map[string]FilterRule{
+		"only_bill": {
+			ID:       "only_bill",
+			Name:     "只允许账单",
+			Type:     "content",
+			Mode:     "whitelist",
+			Patterns: []string{"账单"},
+			Enabled:  true,
+		},
+	}
+	rules := []ForwardRule{
+		{SourceAccount: "acc_1", TargetWebhook: "wh_feishu", FilterRuleIDs: []string{"only_bill"}},
+		{SourceAccount: "acc_1", TargetWebhook: "wh_dingtalk"},
+	}
+
+	targets, sourceMatched, blockedReasons := planForwardTargets(rules, filterRules, msg, filterContext{DisplaySender: msg.From})
+
+	if !sourceMatched || len(blockedReasons) != 1 {
+		t.Fatalf("expected one filtered matching rule, matched=%v reasons=%#v", sourceMatched, blockedReasons)
+	}
+	if len(targets) != 1 || targets[0].ID != "wh_dingtalk" {
+		t.Fatalf("expected allowed matching rule to remain active, got %#v", targets)
+	}
+}
+
 func TestParseInboundPayload_GitHubPush(t *testing.T) {
 	req, err := http.NewRequest("POST", "/hook/test", strings.NewReader(""))
 	if err != nil {

@@ -1346,6 +1346,14 @@ textarea.form-input {
     color: var(--text-tertiary);
 }
 
+.history-error {
+    margin-top: 8px;
+    color: var(--error);
+    font-size: 0.825rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
 /* ===================== Scrollbar ===================== */
 ::-webkit-scrollbar {
     width: 8px;

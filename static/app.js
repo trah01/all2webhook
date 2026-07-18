@@ -666,13 +666,14 @@ function renderHistory(messages) {
                 </span>
                 <span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    ${msg.target_name || '-'}
+                    ${escapeHtml(msg.target_name || '-')}
                 </span>
                 <span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     ${formatDate(msg.created_at)}
                 </span>
             </div>
+            ${msg.error_message ? `<div class="history-error">${escapeHtml(msg.error_message)}</div>` : ''}
         </div>
     `).join('');
 }
